@@ -23,7 +23,7 @@ MIN_SCAN_INTERVAL_MINUTES = 5
 
 # Best-effort per-refresh cap on booking-form fetches used to learn how many
 # players each distinct slot configuration (idCreneau) requires. Cached after.
-MAX_PLAYER_LOOKUPS = 15
+MAX_PLAYER_LOOKUPS = 80
 
 SERVICE_BOOK = "book"
 SERVICE_CANCEL = "cancel"

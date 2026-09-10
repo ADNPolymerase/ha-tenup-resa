@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -88,12 +89,19 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         self.client = client
         self.entry = entry
         self._players_cache: dict[str, int] = {}
+        self._store: Store = Store(hass, 1, f"{DOMAIN}_players_{entry.entry_id}")
+        self._cache_loaded = False
 
     @property
     def days_ahead(self) -> int:
         return int(self.entry.options.get(CONF_DAYS_AHEAD, DEFAULT_DAYS_AHEAD))
 
     async def _async_update_data(self) -> TenupData:
+        if not self._cache_loaded:
+            stored = await self._store.async_load()
+            if isinstance(stored, dict):
+                self._players_cache.update({str(k): int(v) for k, v in stored.items()})
+            self._cache_loaded = True
         today = dt_util.now().date()
         data = TenupData()
         for offset in range(self.days_ahead):
@@ -132,10 +140,14 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         for slot in free:
             if slot.creneau_id not in self._players_cache and slot.creneau_id not in pending:
                 pending[slot.creneau_id] = slot
+        learned = 0
         for creneau_id, slot in list(pending.items())[:MAX_PLAYER_LOOKUPS]:
             players = await self.client.async_required_players(slot.book_path)
             if players is not None:
                 self._players_cache[creneau_id] = players
+                learned += 1
+        if learned:
+            await self._store.async_save(self._players_cache)
         for slot in free:
             slot.required_players = self._players_cache.get(slot.creneau_id)
 
