@@ -55,16 +55,18 @@ class TenupBookingError(TenupError):
     """Ten'Up refused a booking or a cancellation, with its own message."""
 
 
-# Drupal 7 names its session cookie SESS + sha256(cookie domain)[:32]. Ten'Up may
-# be configured with or without the leading dot, so both are tried when the user
-# pastes only the value.
-SESSION_COOKIE_NAMES = (
-    "SESScb2134c30942b300c65ef3e7a0cb8122",  # tenup.fft.fr
-    "SESS299a1e3cc7881f012747993f99f66379",  # .tenup.fft.fr
-    "SESSa3f3c315059fce3e5cba5addd6cfa12b",  # www.tenup.fft.fr
-    "SESS7ba44afc36c80c3faa2b8fa87e7742c5",  # .fft.fr
-    "SESS92f2eb7df5a16f11bfa33ba3b3d183bd",  # fft.fr
+# Drupal 7 names its session cookie SESS + sha256(cookie domain)[:32], with an
+# SSESS prefix when the site is served over HTTPS. Ten'Up sets it on ".fft.fr"
+# (observed: SSESS7ba44afc36c80c3faa2b8fa87e7742c5); the other domains are kept
+# in case the FFT changes its setup. Tried in order when the user pastes only the value.
+_DOMAIN_HASHES = (
+    "7ba44afc36c80c3faa2b8fa87e7742c5",  # .fft.fr
+    "cb2134c30942b300c65ef3e7a0cb8122",  # tenup.fft.fr
+    "299a1e3cc7881f012747993f99f66379",  # .tenup.fft.fr
+    "92f2eb7df5a16f11bfa33ba3b3d183bd",  # fft.fr
+    "a3f3c315059fce3e5cba5addd6cfa12b",  # www.tenup.fft.fr
 )
+SESSION_COOKIE_NAMES = tuple(f"{prefix}{h}" for h in _DOMAIN_HASHES for prefix in ("SSESS", "SESS"))
 
 
 def _clean_cookie_text(raw: str) -> str:

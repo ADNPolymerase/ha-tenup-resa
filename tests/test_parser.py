@@ -135,7 +135,9 @@ def test_cookie_candidates():
     assert cookie_candidates("Cookie: SESSabc=123; datadome=x") == ["SESSabc=123; datadome=x"]
     bare = cookie_candidates("  abc-DEF_123\n")
     assert bare == [f"{name}=abc-DEF_123" for name in SESSION_COOKIE_NAMES]
-    assert bare[0].startswith("SESScb2134c30942b300c65ef3e7a0cb8122=")
+    assert bare[0].startswith("SSESS7ba44afc36c80c3faa2b8fa87e7742c5=")
+    assert bare[1].startswith("SESS7ba44afc36c80c3faa2b8fa87e7742c5=")
+    assert len(bare) == 10
     with pytest.raises(ValueError):
         cookie_candidates("not a cookie value!")
     with pytest.raises(ValueError):
