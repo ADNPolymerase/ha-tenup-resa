@@ -189,11 +189,19 @@ def extract_drupal_settings(html: str) -> dict[str, Any]:
     return obj
 
 
+_BODY_RE = re.compile(r"<body\b[^>]*\bclass=[\"']([^\"']*)[\"']", re.IGNORECASE)
+
+
+def body_classes(html: str) -> set[str]:
+    """Classes of the <body> tag (Drupal puts the session state there)."""
+    match = _BODY_RE.search(html)
+    return set(match.group(1).split()) if match else set()
+
+
 def is_logged_in(html: str) -> bool:
     """Ten'Up flags the session state in the body classes."""
-    parser = _PlanningHTMLParser()
-    parser.feed(html[:20000])
-    return "logged-in" in parser.body_classes and "not-logged-in" not in parser.body_classes
+    classes = body_classes(html)
+    return "logged-in" in classes and "not-logged-in" not in classes
 
 
 def parse_planning(html: str, day: date, tzinfo: Any) -> Planning:
@@ -201,9 +209,7 @@ def parse_planning(html: str, day: date, tzinfo: Any) -> Planning:
     parser = _PlanningHTMLParser()
     parser.feed(html)
     planning = Planning(day=day)
-    planning.logged_in = (
-        "logged-in" in parser.body_classes and "not-logged-in" not in parser.body_classes
-    )
+    planning.logged_in = is_logged_in(html)
 
     try:
         settings = extract_drupal_settings(html)
@@ -272,7 +278,15 @@ def parse_planning(html: str, day: date, tzinfo: Any) -> Planning:
     return planning
 
 
+_DURATION_RE = re.compile(r"^adherent-reservation-calendrier-row-(\d+)$")
+
+
 def _cell_end(cell: dict[str, Any], start: datetime) -> datetime:
+    # The row-30 / row-60 / row-90 class is exact; data-end-ts only has hour precision.
+    for cls in cell["classes"]:
+        match = _DURATION_RE.match(cls)
+        if match:
+            return start + timedelta(minutes=int(match.group(1)))
     end_ts = cell.get("end_ts")
     if end_ts:
         try:

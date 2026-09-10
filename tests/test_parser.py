@@ -32,7 +32,7 @@ def test_planning_courts_and_states():
     assert planning.window_end == datetime(2026, 9, 16, 0, 0, tzinfo=TZ)
 
     by_id = {s.slot_id: s for s in planning.slots}
-    assert len(by_id) == 6
+    assert len(by_id) == 7
 
     past = by_id["21099_0800"]
     assert past.state == SLOT_BUSY and past.label is None
@@ -57,7 +57,13 @@ def test_planning_courts_and_states():
 
     half = by_id["21100_2200"]
     assert half.state == SLOT_FREE
-    assert half.end == datetime(2026, 9, 10, 22, 30, tzinfo=TZ)
+    assert half.end == datetime(2026, 9, 10, 22, 30, tzinfo=TZ)  # row-30 wins over the truncated data-end-ts
+
+    lesson = by_id["21100_1130"]
+    assert lesson.state == SLOT_BUSY
+    assert lesson.start == datetime(2026, 9, 10, 11, 30, tzinfo=TZ)
+    assert lesson.end == datetime(2026, 9, 10, 13, 0, tzinfo=TZ)
+    assert lesson.label == "CJ sam 11h30 Alex Robin"
 
     assert [s.slot_id for s in planning.free_slots] == ["21099_1000", "21100_2000", "21100_2200"]
     assert [s.slot_id for s in planning.my_slots] == ["21100_2100"]
@@ -66,7 +72,9 @@ def test_planning_courts_and_states():
 
 
 def test_logged_in_detection():
-    assert is_logged_in(load("planning.html"))
+    html = load("planning.html")
+    assert html.index("<body") > 20000  # the body comes after a large head, like the real pages
+    assert is_logged_in(html)
     assert not is_logged_in(load("planning.html").replace("logged-in", "not-logged-in"))
     assert not is_logged_in("<html><body class='html'></body></html>")
 
