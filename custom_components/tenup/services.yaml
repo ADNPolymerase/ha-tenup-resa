@@ -1,0 +1,39 @@
+book:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: tenup
+    court_id:
+      required: true
+      example: "21100"
+      selector:
+        text:
+    start:
+      required: true
+      example: "2026-09-10 21:00:00"
+      selector:
+        datetime:
+cancel:
+  fields:
+    entry_id:
+      required: false
+      selector:
+        config_entry:
+          integration: tenup
+    reservation_id:
+      required: false
+      example: "165841846"
+      selector:
+        text:
+    court_id:
+      required: false
+      example: "21100"
+      selector:
+        text:
+    start:
+      required: false
+      example: "2026-09-10 21:00:00"
+      selector:
+        datetime:
