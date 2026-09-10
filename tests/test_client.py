@@ -60,59 +60,70 @@ class FakeSession:
         return self._find("POST", url, kwargs)
 
 
-def run(coro):
-    return asyncio.new_event_loop().run_until_complete(coro)
+def run(fn):
+    """aiohttp's CookieJar needs a running loop: build everything inside one."""
+    return asyncio.run(fn())
 
 
 def test_cookie_lands_in_the_jar():
-    session = FakeSession({})
-    TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-    names = {c.key for c in session.cookie_jar}
-    assert names == {"SSESSabc"}
+    async def main():
+        session = FakeSession({})
+        TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        return {c.key for c in session.cookie_jar}
+    assert run(main) == {"SSESSabc"}
 
 
 def test_planning_request_passes_only_supported_kwargs():
-    session = FakeSession({("GET", "/club/87654321/reservations/20260910"): [
-        FakeResponse(PLANNING, "https://tenup.fft.fr/club/87654321/reservations/20260910")]})
-    client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-    planning = run(client.async_get_planning(date(2026, 9, 10)))
+    async def main():
+        session = FakeSession({("GET", "/club/87654321/reservations/20260910"): [
+            FakeResponse(PLANNING, "https://tenup.fft.fr/club/87654321/reservations/20260910")]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        planning = await client.async_get_planning(date(2026, 9, 10))
+        return planning, session.calls
+    planning, calls = run(main)
     assert len(planning.courts) == 2
-    method, url, kwargs = session.calls[0]
+    method, url, kwargs = calls[0]
     assert method == "GET" and url.endswith("/reservations/20260910")
     assert set(kwargs) <= {"headers", "data", "allow_redirects", "timeout"}, kwargs
 
 
 def test_not_logged_in_raises_auth_error():
-    body = PLANNING.replace("logged-in", "not-logged-in")
-    session = FakeSession({("GET", "/reservations/"): [FakeResponse(body, "https://tenup.fft.fr/club/87654321/reservations/20260910", 403)]})
-    client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+    async def main():
+        body = PLANNING.replace("logged-in", "not-logged-in")
+        session = FakeSession({("GET", "/reservations/"): [FakeResponse(body, "https://tenup.fft.fr/club/87654321/reservations/20260910", 403)]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_get_planning(date(2026, 9, 10))
     with pytest.raises(TenupAuthError):
-        run(client.async_get_planning(date(2026, 9, 10)))
+        run(main)
 
 
 def test_queue_it_is_passed_once_then_retried():
-    session = FakeSession({
-        ("GET", "/reservations/"): [
-            FakeResponse("<html>queue</html>", "https://tenup.queue-it.net/?c=tenup"),
-            FakeResponse(PLANNING, "https://tenup.fft.fr/club/87654321/reservations/20260910"),
-        ],
-        ("POST", "queue-it.net/spa-api"): [FakeResponse('{"redirectUrl": "https://tenup.fft.fr/x?queueittoken=abc"}', "https://tenup.queue-it.net/spa-api")],
-        ("GET", "queueittoken=abc"): [FakeResponse("", "https://tenup.fft.fr/x")],
-    })
-    client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-    planning = run(client.async_get_planning(date(2026, 9, 10)))
+    async def main():
+        session = FakeSession({
+            ("GET", "/reservations/"): [
+                FakeResponse("<html>queue</html>", "https://tenup.queue-it.net/?c=tenup"),
+                FakeResponse(PLANNING, "https://tenup.fft.fr/club/87654321/reservations/20260910"),
+            ],
+            ("POST", "queue-it.net/spa-api"): [FakeResponse('{"redirectUrl": "https://tenup.fft.fr/x?queueittoken=abc"}', "https://tenup.queue-it.net/spa-api")],
+            ("GET", "queueittoken=abc"): [FakeResponse("", "https://tenup.fft.fr/x")],
+        })
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        planning = await client.async_get_planning(date(2026, 9, 10))
+        return planning, session.calls
+    planning, calls = run(main)
     assert len(planning.slots) == 7
-    methods = [(m, u.split("?")[0][-40:]) for m, u, _ in session.calls]
-    assert methods[1][0] == "POST" and "spa-api" in session.calls[1][1]
-    assert len(session.calls) == 4
+    assert calls[1][0] == "POST" and "spa-api" in calls[1][1]
+    assert len(calls) == 4
 
 
 def test_queue_it_that_never_opens_is_an_error():
-    session = FakeSession({
-        ("GET", "/reservations/"): [FakeResponse("<html>queue</html>", "https://tenup.queue-it.net/?c=tenup")],
-        ("POST", "queue-it.net/spa-api"): [FakeResponse('{"redirectUrl": "https://tenup.fft.fr/x?queueittoken=abc"}', "https://tenup.queue-it.net/spa-api")],
-        ("GET", "queueittoken=abc"): [FakeResponse("", "https://tenup.fft.fr/x")],
-    })
-    client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+    async def main():
+        session = FakeSession({
+            ("GET", "/reservations/"): [FakeResponse("<html>queue</html>", "https://tenup.queue-it.net/?c=tenup")],
+            ("POST", "queue-it.net/spa-api"): [FakeResponse('{"redirectUrl": "https://tenup.fft.fr/x?queueittoken=abc"}', "https://tenup.queue-it.net/spa-api")],
+            ("GET", "queueittoken=abc"): [FakeResponse("", "https://tenup.fft.fr/x")],
+        })
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_get_planning(date(2026, 9, 10))
     with pytest.raises(TenupConnectionError):
-        run(client.async_get_planning(date(2026, 9, 10)))
+        run(main)
