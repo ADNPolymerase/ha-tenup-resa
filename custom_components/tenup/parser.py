@@ -54,6 +54,8 @@ class Slot:
     cancel_path: str | None = None
     reservation_id: str | None = None
     slot_id: str | None = None
+    creneau_id: str | None = None
+    required_players: int | None = None
 
     @property
     def hhmm(self) -> str:
@@ -70,6 +72,7 @@ class Slot:
             "state": self.state,
             "label": self.label,
             "reservation_id": self.reservation_id,
+            "required_players": self.required_players,
         }
 
 
@@ -266,6 +269,9 @@ def parse_planning(html: str, day: date, tzinfo: Any) -> Planning:
             if book is not None:
                 slot.state = SLOT_FREE
                 slot.book_path = book["href"]
+                parsed = parse_book_path(book["href"])
+                if parsed:
+                    slot.creneau_id = parsed[1]
             else:
                 slot.state = SLOT_BUSY
                 slot.label = text or None

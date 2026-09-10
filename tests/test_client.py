@@ -127,3 +127,22 @@ def test_queue_it_that_never_opens_is_an_error():
         await client.async_get_planning(date(2026, 9, 10))
     with pytest.raises(TenupConnectionError):
         run(main)
+
+
+def test_required_players_reads_the_booking_form():
+    async def main():
+        detail = (FIXTURES / "detail.html").read_text(encoding="utf-8")
+        session = FakeSession({("GET", "/reservation_court_add/"): [
+            FakeResponse(detail, "https://tenup.fft.fr/club/reservation_court_add/nojs/21100/56152/1/2")]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        return await client.async_required_players("/club/reservation_court_add/nojs/21100/56152/1/2")
+    assert run(main) == 1  # detail.html fixture asks for 1 player
+
+
+def test_required_players_is_none_on_garbage():
+    async def main():
+        session = FakeSession({("GET", "/reservation_court_add/"): [
+            FakeResponse("<html><body class='logged-in'>nope</body></html>", "https://tenup.fft.fr/x")]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        return await client.async_required_players("/club/reservation_court_add/nojs/9/9/1/2")
+    assert run(main) is None

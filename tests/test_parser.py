@@ -44,6 +44,10 @@ def test_planning_courts_and_states():
     free = by_id["21099_1000"]
     assert free.state == SLOT_FREE
     assert free.book_path.startswith("/club/reservation_court_add/nojs/21099/56086/")
+    assert free.creneau_id == "56086"  # idCreneau, the (court + time band) config key
+    assert free.required_players is None  # unknown until the coordinator looks it up
+    assert free.as_dict()["required_players"] is None
+    assert by_id["21100_2000"].creneau_id == "56152"
     assert free.court_name == "Court COUVERT"
     assert free.start == datetime(2026, 9, 10, 10, 0, tzinfo=TZ)
     assert free.end == datetime(2026, 9, 10, 11, 0, tzinfo=TZ)

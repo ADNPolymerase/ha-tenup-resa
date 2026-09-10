@@ -14,6 +14,7 @@ from homeassistant.util import dt as dt_util
 
 from .api import TenupAuthError, TenupClient, TenupConnectionError
 from .const import (
+    MAX_PLAYER_LOOKUPS,
     CONF_DAYS_AHEAD,
     CONF_SCAN_INTERVAL,
     DEFAULT_DAYS_AHEAD,
@@ -86,6 +87,7 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         )
         self.client = client
         self.entry = entry
+        self._players_cache: dict[str, int] = {}
 
     @property
     def days_ahead(self) -> int:
@@ -110,8 +112,32 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
                 day + timedelta(days=1), datetime.min.time(), planning.window_end.tzinfo
             ) > planning.window_end:
                 break
+        await self._annotate_required_players(data)
         data.fetched_at = dt_util.now()
         return data
+
+    async def _annotate_required_players(self, data: TenupData) -> None:
+        """Tag each free slot with how many players its config needs (Couvert = 2, ...).
+
+        Keyed on idCreneau (court + time band), learned once per config and cached,
+        so a club that varies the rule by hour is handled correctly. Bounded per refresh.
+        """
+        free = [
+            s
+            for planning in data.plannings.values()
+            for s in planning.slots
+            if s.state == SLOT_FREE and s.book_path and s.creneau_id
+        ]
+        pending: dict[str, Slot] = {}
+        for slot in free:
+            if slot.creneau_id not in self._players_cache and slot.creneau_id not in pending:
+                pending[slot.creneau_id] = slot
+        for creneau_id, slot in list(pending.items())[:MAX_PLAYER_LOOKUPS]:
+            players = await self.client.async_required_players(slot.book_path)
+            if players is not None:
+                self._players_cache[creneau_id] = players
+        for slot in free:
+            slot.required_players = self._players_cache.get(slot.creneau_id)
 
     async def async_book(self, slot: Slot) -> str:
         result = await self.client.async_book(slot)

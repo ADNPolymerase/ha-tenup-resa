@@ -273,6 +273,18 @@ class TenupClient:
                 f"Unexpected reservation detail page at {final_url.path}: {err}"
             ) from err
 
+    async def async_required_players(self, book_path: str) -> int | None:
+        """Best-effort: how many players a slot's booking configuration requires.
+
+        Returns None when it can't be determined (parse/connection hiccup); the
+        caller caches the result per idCreneau so this runs at most once per config.
+        """
+        try:
+            body, _ = await self._get_html(book_path)
+            return parse_booking_form(body).required_players
+        except (TenupParseError, TenupError):
+            return None
+
     async def async_book(self, slot: Slot) -> str:
         """Book a free slot for the account owner alone. Returns the confirmation text."""
         form = await self.async_get_booking_form(slot)
