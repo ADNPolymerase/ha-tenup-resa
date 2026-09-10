@@ -12,7 +12,7 @@
       },
       "cookie": {
         "title": "Session Ten'Up",
-        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration : collez votre cookie de session.\n\n1. Connectez-vous sur {site} dans votre navigateur.\n2. Ouvrez les outils de développement (F12), onglet Application (Chrome) ou Stockage (Firefox), puis Cookies > {site_url}.\n3. Copiez la valeur du cookie dont le nom commence par SESS et collez-la ci-dessous sous la forme `SESSxxxx=valeur`.\n\nClub : {club} ({club_code})",
+        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration : collez votre cookie de session.\n\n1. Connectez-vous sur {site} dans votre navigateur.\n2. Ouvrez les outils de développement (F12), onglet Application (Chrome) ou Stockage (Firefox), puis Cookies > {site_url}.\n3. Copiez la valeur du cookie dont le nom commence par SESS et collez-la ci-dessous (la valeur seule suffit, `SESSxxxx=valeur` marche aussi).\n\nClub : {club} ({club_code})",
         "data": { "cookie": "Cookie de session" }
       },
       "reauth_confirm": {
@@ -24,7 +24,7 @@
     "error": {
       "cannot_connect": "Ten'Up est injoignable",
       "no_club": "Aucun club trouvé, essayez une autre orthographe",
-      "invalid_cookie": "Ce n'est pas un cookie (attendu : SESSxxxx=valeur)",
+      "invalid_cookie": "Ce n'est pas une valeur de cookie",
       "invalid_auth": "Ten'Up ne reconnaît pas cette session : reconnectez-vous et copiez un cookie frais",
       "no_planning": "Connecté, mais le tableau de réservation de ce club est vide (est-ce bien votre club ?)"
     },

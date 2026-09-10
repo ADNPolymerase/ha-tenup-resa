@@ -12,7 +12,7 @@
       },
       "cookie": {
         "title": "Ten'Up session",
-        "description": "Ten'Up does not allow logging in with a password from an integration, so paste your session cookie.\n\n1. Log in on {site} in your browser.\n2. Open the developer tools (F12), tab Application (Chrome) or Storage (Firefox), then Cookies > {site_url}.\n3. Copy the value of the cookie whose name starts with SESS and paste it below as `SESSxxxx=value`.\n\nClub: {club} ({club_code})",
+        "description": "Ten'Up does not allow logging in with a password from an integration, so paste your session cookie.\n\n1. Log in on {site} in your browser.\n2. Open the developer tools (F12), tab Application (Chrome) or Storage (Firefox), then Cookies > {site_url}.\n3. Copy the value of the cookie whose name starts with SESS and paste it below (the value alone is enough, `SESSxxxx=value` works too).\n\nClub: {club} ({club_code})",
         "data": { "cookie": "Session cookie" }
       },
       "reauth_confirm": {
@@ -24,7 +24,7 @@
     "error": {
       "cannot_connect": "Ten'Up could not be reached",
       "no_club": "No club found, try another spelling",
-      "invalid_cookie": "This does not look like a cookie (expected SESSxxxx=value)",
+      "invalid_cookie": "This does not look like a cookie value",
       "invalid_auth": "Ten'Up does not recognise this session, log in again and copy a fresh cookie",
       "no_planning": "Logged in, but the reservation grid of this club is empty (is it your club?)"
     },

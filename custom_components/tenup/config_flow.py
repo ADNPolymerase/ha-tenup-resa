@@ -33,6 +33,7 @@ from .api import (
     TenupAuthError,
     TenupClient,
     TenupConnectionError,
+    cookie_candidates,
     parse_cookie_header,
 )
 from .const import (
@@ -115,7 +116,7 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             assert self._club_code is not None
-            error = await self._async_validate_cookie(user_input[CONF_COOKIE], self._club_code)
+            error, cookie = await self._async_validate_cookie(user_input[CONF_COOKIE], self._club_code)
             if error:
                 errors["base"] = error
             else:
@@ -126,7 +127,7 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
                     data={
                         CONF_CLUB_CODE: self._club_code,
                         CONF_CLUB_NAME: self._club_name,
-                        CONF_COOKIE: user_input[CONF_COOKIE].strip(),
+                        CONF_COOKIE: cookie,
                     },
                 )
         return self.async_show_form(
@@ -144,23 +145,30 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             "site_url": "https://tenup.fft.fr",
         }
 
-    async def _async_validate_cookie(self, cookie: str, club_code: str) -> str | None:
+    async def _async_validate_cookie(self, cookie: str, club_code: str) -> tuple[str | None, str]:
+        """Try what the user pasted; returns (error, cookie to store)."""
         try:
-            parse_cookie_header(cookie)
+            candidates = cookie_candidates(cookie)
+            for candidate in candidates:
+                parse_cookie_header(candidate)
         except ValueError:
-            return "invalid_cookie"
-        client = TenupClient(
-            async_get_clientsession(self.hass), cookie, club_code, dt_util.get_default_time_zone()
-        )
-        try:
-            planning = await client.async_validate()
-        except TenupAuthError:
-            return "invalid_auth"
-        except TenupConnectionError:
-            return "cannot_connect"
-        if not planning.courts:
-            return "no_planning"
-        return None
+            return "invalid_cookie", cookie
+        error = "invalid_auth"
+        for candidate in candidates:
+            client = TenupClient(
+                async_get_clientsession(self.hass), candidate, club_code, dt_util.get_default_time_zone()
+            )
+            try:
+                planning = await client.async_validate()
+            except TenupAuthError:
+                error = "invalid_auth"
+                continue
+            except TenupConnectionError:
+                return "cannot_connect", candidate
+            if not planning.courts:
+                return "no_planning", candidate
+            return None, candidate
+        return error, cookie
 
     # --------------------------------------------------------------- reauth
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
@@ -172,14 +180,12 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             assert self._club_code is not None
-            error = await self._async_validate_cookie(user_input[CONF_COOKIE], self._club_code)
+            error, cookie = await self._async_validate_cookie(user_input[CONF_COOKIE], self._club_code)
             if error:
                 errors["base"] = error
             else:
                 entry = self._get_reauth_entry()
-                return self.async_update_reload_and_abort(
-                    entry, data_updates={CONF_COOKIE: user_input[CONF_COOKIE].strip()}
-                )
+                return self.async_update_reload_and_abort(entry, data_updates={CONF_COOKIE: cookie})
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=STEP_COOKIE_SCHEMA,

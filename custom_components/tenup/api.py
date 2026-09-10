@@ -55,13 +55,46 @@ class TenupBookingError(TenupError):
     """Ten'Up refused a booking or a cancellation, with its own message."""
 
 
+# Drupal 7 names its session cookie SESS + sha256(cookie domain)[:32]. Ten'Up may
+# be configured with or without the leading dot, so both are tried when the user
+# pastes only the value.
+SESSION_COOKIE_NAMES = (
+    "SESScb2134c30942b300c65ef3e7a0cb8122",  # tenup.fft.fr
+    "SESS299a1e3cc7881f012747993f99f66379",  # .tenup.fft.fr
+    "SESSa3f3c315059fce3e5cba5addd6cfa12b",  # www.tenup.fft.fr
+    "SESS7ba44afc36c80c3faa2b8fa87e7742c5",  # .fft.fr
+    "SESS92f2eb7df5a16f11bfa33ba3b3d183bd",  # fft.fr
+)
+
+
+def _clean_cookie_text(raw: str) -> str:
+    text = " ".join(raw.replace("\r", " ").replace("\n", " ").split())
+    if text.lower().startswith("cookie:"):
+        text = text[7:].strip()
+    return text.strip().strip('"').strip("'").strip()
+
+
+def cookie_candidates(raw: str) -> list[str]:
+    """Return the ``name=value`` strings to try for what the user pasted.
+
+    ``SESSxxx=yyy`` and full ``Cookie:`` headers are returned as is. A bare value
+    (no ``=``) is combined with the known Drupal session cookie names.
+    """
+    text = _clean_cookie_text(raw)
+    if not text:
+        raise ValueError("no cookie found")
+    if "=" in text:
+        return [text]
+    if not text.replace("-", "").replace("_", "").isalnum():
+        raise ValueError("not a cookie value")
+    return [f"{name}={text}" for name in SESSION_COOKIE_NAMES]
+
+
 def parse_cookie_header(raw: str) -> dict[str, str]:
     """Accept ``SESSxxx=yyy`` or a whole ``Cookie:`` header, return name -> value."""
-    raw = raw.strip()
-    if raw.lower().startswith("cookie:"):
-        raw = raw[7:].strip()
+    text = _clean_cookie_text(raw)
     cookie: SimpleCookie = SimpleCookie()
-    cookie.load(raw)
+    cookie.load(text)
     values = {name: morsel.value for name, morsel in cookie.items()}
     if not values:
         raise ValueError("no cookie found")

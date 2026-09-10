@@ -126,3 +126,17 @@ def test_cookie_header():
     assert parse_cookie_header("Cookie: SESSabc=123; datadome=xyz") == {"SESSabc": "123", "datadome": "xyz"}
     with pytest.raises(ValueError):
         parse_cookie_header("   ")
+
+
+def test_cookie_candidates():
+    from custom_components.tenup.api import SESSION_COOKIE_NAMES, cookie_candidates
+
+    assert cookie_candidates("SESSabc=123") == ["SESSabc=123"]
+    assert cookie_candidates("Cookie: SESSabc=123; datadome=x") == ["SESSabc=123; datadome=x"]
+    bare = cookie_candidates("  abc-DEF_123\n")
+    assert bare == [f"{name}=abc-DEF_123" for name in SESSION_COOKIE_NAMES]
+    assert bare[0].startswith("SESScb2134c30942b300c65ef3e7a0cb8122=")
+    with pytest.raises(ValueError):
+        cookie_candidates("not a cookie value!")
+    with pytest.raises(ValueError):
+        cookie_candidates("   ")
