@@ -14,7 +14,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
-from homeassistant.helpers.aiohttp_client import async_create_clientsession, async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -34,7 +34,7 @@ from .api import (
     TenupClient,
     TenupConnectionError,
     cookie_candidates,
-    new_cookie_jar,
+    new_session,
     parse_cookie_header,
 )
 from .const import (
@@ -155,7 +155,7 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
         except ValueError:
             return "invalid_cookie", cookie
         error = "invalid_auth"
-        session = async_create_clientsession(self.hass, cookie_jar=new_cookie_jar())
+        session = new_session()
         try:
             for candidate in candidates:
                 client = TenupClient(session, candidate, club_code, dt_util.get_default_time_zone())

@@ -108,6 +108,17 @@ def new_cookie_jar() -> aiohttp.CookieJar:
     return aiohttp.CookieJar()
 
 
+def new_session() -> aiohttp.ClientSession:
+    """A dedicated, self-managed aiohttp session with its own cookie jar.
+
+    We manage its lifecycle ourselves (close it on unload / after validation),
+    so it must NOT come from ``async_create_clientsession`` — closing one of those
+    trips Home Assistant's "integration closes the HA aiohttp session" warning.
+    Must be called from within a running event loop.
+    """
+    return aiohttp.ClientSession(cookie_jar=new_cookie_jar())
+
+
 class TenupClient:
     """Talk to tenup.fft.fr with a user-provided session cookie.
 

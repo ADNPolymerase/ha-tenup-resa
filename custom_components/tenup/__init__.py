@@ -7,10 +7,9 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.util import dt as dt_util
 
-from .api import TenupAuthError, TenupClient, TenupConnectionError, new_cookie_jar
+from .api import TenupAuthError, TenupClient, TenupConnectionError, new_session
 from .const import CONF_CLUB_CODE, CONF_COOKIE, DOMAIN
 from .coordinator import TenupCoordinator
 from .services import async_setup_services
@@ -31,7 +30,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> bool:
     """Set up Ten'Up from a config entry."""
-    session = async_create_clientsession(hass, cookie_jar=new_cookie_jar())
+    session = new_session()
     client = TenupClient(
         session,
         entry.data[CONF_COOKIE],
