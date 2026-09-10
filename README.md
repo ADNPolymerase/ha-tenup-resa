@@ -1,8 +1,8 @@
 # Ten'Up for Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
-[![GitHub Release](https://badgen.net/github/release/ADNPolymerase/ha-tenup)](https://github.com/ADNPolymerase/ha-tenup/releases)
-[![Hassfest](https://github.com/ADNPolymerase/ha-tenup/actions/workflows/hassfest.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup/actions/workflows/hassfest.yml)
+[![GitHub Release](https://badgen.net/github/release/ADNPolymerase/ha-tenup-resa)](https://github.com/ADNPolymerase/ha-tenup-resa/releases)
+[![Hassfest](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 See the free courts of your tennis club on [Ten'Up](https://tenup.fft.fr) (French Tennis Federation) and book or cancel a court from Home Assistant.
@@ -25,7 +25,7 @@ The integration reads the member reservation grid of your club (`Réserver dans 
 
 ## Installation
 
-1. HACS > Integrations > three dots > Custom repositories > add `https://github.com/ADNPolymerase/ha-tenup` (category Integration).
+1. HACS > Integrations > three dots > Custom repositories > add `https://github.com/ADNPolymerase/ha-tenup-resa` (category Integration).
 2. Install **Ten'Up**, restart Home Assistant.
 3. Settings > Devices and services > Add integration > **Ten'Up**.
 
@@ -67,4 +67,4 @@ Only slots that require a single player are bookable for now. Courts that requir
 
 ## Support
 
-Issues and ideas: [GitHub issues](https://github.com/ADNPolymerase/ha-tenup/issues).
+Issues and ideas: [GitHub issues](https://github.com/ADNPolymerase/ha-tenup-resa/issues).

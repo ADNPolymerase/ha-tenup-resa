@@ -20,7 +20,7 @@ L'intégration lit le tableau de réservation des adhérents (« Réserver dans 
 
 ## Installation
 
-1. HACS > Intégrations > trois points > Dépôts personnalisés > ajouter `https://github.com/ADNPolymerase/ha-tenup` (catégorie Intégration).
+1. HACS > Intégrations > trois points > Dépôts personnalisés > ajouter `https://github.com/ADNPolymerase/ha-tenup-resa` (catégorie Intégration).
 2. Installer **Ten'Up**, redémarrer Home Assistant.
 3. Paramètres > Appareils et services > Ajouter une intégration > **Ten'Up**.
 
@@ -62,4 +62,4 @@ Seuls les créneaux à un joueur sont réservables pour l'instant. Les courts qu
 
 ## Support
 
-Bugs et idées : [GitHub issues](https://github.com/ADNPolymerase/ha-tenup/issues).
+Bugs et idées : [GitHub issues](https://github.com/ADNPolymerase/ha-tenup-resa/issues).
