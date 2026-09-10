@@ -103,8 +103,17 @@ def parse_cookie_header(raw: str) -> dict[str, str]:
     return values
 
 
+def new_cookie_jar() -> aiohttp.CookieJar:
+    """A jar for a dedicated Ten'Up session (never share HA's default session: cookies)."""
+    return aiohttp.CookieJar()
+
+
 class TenupClient:
-    """Talk to tenup.fft.fr with a user-provided session cookie."""
+    """Talk to tenup.fft.fr with a user-provided session cookie.
+
+    ``session`` must be a dedicated ``aiohttp.ClientSession`` created with its own
+    cookie jar (see ``new_cookie_jar``): the Ten'Up cookies live in that jar.
+    """
 
     def __init__(
         self,
@@ -117,8 +126,13 @@ class TenupClient:
         self._club_code = str(club_code)
         self._tzinfo = tzinfo
         self._queue_lock = asyncio.Lock()
-        self._jar = aiohttp.CookieJar()
+        self._jar = session.cookie_jar
         self.set_cookie(cookie)
+
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        """The dedicated session (it carries the Ten'Up cookies)."""
+        return self._session
 
     # ------------------------------------------------------------------ session
     def set_cookie(self, cookie: str) -> None:
@@ -126,6 +140,8 @@ class TenupClient:
         values = parse_cookie_header(cookie)
         self._jar.clear()
         self._jar.update_cookies(values, URL(BASE_URL))
+        # Ten'Up sets its session cookie on .fft.fr: make it available to every host there.
+        self._jar.update_cookies(values, URL("https://fft.fr"))
 
     @property
     def club_code(self) -> str:
@@ -149,7 +165,6 @@ class TenupClient:
                 headers=headers,
                 data=data,
                 allow_redirects=allow_redirects,
-                cookie_jar=self._jar,
                 timeout=_TIMEOUT,
             ) as resp:
                 body = await resp.text()
@@ -191,7 +206,6 @@ class TenupClient:
                         "Origin": "https://tenup.queue-it.net",
                         "Referer": "https://tenup.queue-it.net/",
                     },
-                    cookie_jar=self._jar,
                     timeout=_TIMEOUT,
                 ) as resp:
                     data = await resp.json(content_type=None)
@@ -202,7 +216,6 @@ class TenupClient:
                     redirect,
                     headers=_HTML_HEADERS,
                     allow_redirects=True,
-                    cookie_jar=self._jar,
                     timeout=_TIMEOUT,
                 ) as resp:
                     await resp.read()

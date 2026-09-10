@@ -7,10 +7,10 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.util import dt as dt_util
 
-from .api import TenupAuthError, TenupClient, TenupConnectionError
+from .api import TenupAuthError, TenupClient, TenupConnectionError, new_cookie_jar
 from .const import CONF_CLUB_CODE, CONF_COOKIE, DOMAIN
 from .coordinator import TenupCoordinator
 from .services import async_setup_services
@@ -31,8 +31,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> bool:
     """Set up Ten'Up from a config entry."""
+    session = async_create_clientsession(hass, cookie_jar=new_cookie_jar())
     client = TenupClient(
-        async_get_clientsession(hass),
+        session,
         entry.data[CONF_COOKIE],
         entry.data[CONF_CLUB_CODE],
         dt_util.get_default_time_zone(),
@@ -45,6 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> boo
     except (TenupAuthError,) as err:
         raise ConfigEntryAuthFailed(str(err)) from err
     except TenupConnectionError as err:
+        await session.close()
         raise ConfigEntryNotReady(str(err)) from err
 
     entry.runtime_data = coordinator
@@ -59,4 +61,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: TenupConfigEntry) -
 
 async def async_unload_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> bool:
     """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        await entry.runtime_data.client.session.close()
+    return unloaded
