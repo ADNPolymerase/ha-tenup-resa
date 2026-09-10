@@ -133,8 +133,16 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="cookie",
             data_schema=STEP_COOKIE_SCHEMA,
             errors=errors,
-            description_placeholders={"club": self._club_name or "", "club_code": self._club_code or ""},
+            description_placeholders=self._placeholders(),
         )
+
+    def _placeholders(self) -> dict[str, str]:
+        return {
+            "club": self._club_name or "",
+            "club_code": self._club_code or "",
+            "site": "tenup.fft.fr",
+            "site_url": "https://tenup.fft.fr",
+        }
 
     async def _async_validate_cookie(self, cookie: str, club_code: str) -> str | None:
         try:
@@ -176,7 +184,7 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=STEP_COOKIE_SCHEMA,
             errors=errors,
-            description_placeholders={"club": self._club_name or "", "club_code": self._club_code or ""},
+            description_placeholders=self._placeholders(),
         )
 
     @staticmethod

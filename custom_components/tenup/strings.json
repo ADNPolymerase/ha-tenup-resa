@@ -12,12 +12,12 @@
       },
       "cookie": {
         "title": "Ten'Up session",
-        "description": "Ten'Up does not allow logging in with a password from an integration, so paste your session cookie.\n\n1. Log in on tenup.fft.fr in your browser.\n2. Open the developer tools (F12), tab Application (Chrome) or Storage (Firefox), then Cookies > https://tenup.fft.fr.\n3. Copy the value of the cookie whose name starts with SESS and paste it below as `SESSxxxx=value`.\n\nClub: {club} ({club_code})",
+        "description": "Ten'Up does not allow logging in with a password from an integration, so paste your session cookie.\n\n1. Log in on {site} in your browser.\n2. Open the developer tools (F12), tab Application (Chrome) or Storage (Firefox), then Cookies > {site_url}.\n3. Copy the value of the cookie whose name starts with SESS and paste it below as `SESSxxxx=value`.\n\nClub: {club} ({club_code})",
         "data": { "cookie": "Session cookie" }
       },
       "reauth_confirm": {
         "title": "Ten'Up session expired",
-        "description": "Log in again on tenup.fft.fr and paste a fresh SESS cookie for {club} ({club_code}).",
+        "description": "Log in again on {site} and paste a fresh SESS cookie for {club} ({club_code}).",
         "data": { "cookie": "Session cookie" }
       }
     },

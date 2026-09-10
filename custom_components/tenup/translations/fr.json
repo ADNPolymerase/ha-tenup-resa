@@ -12,12 +12,12 @@
       },
       "cookie": {
         "title": "Session Ten'Up",
-        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration : collez votre cookie de session.\n\n1. Connectez-vous sur tenup.fft.fr dans votre navigateur.\n2. Ouvrez les outils de développement (F12), onglet Application (Chrome) ou Stockage (Firefox), puis Cookies > https://tenup.fft.fr.\n3. Copiez la valeur du cookie dont le nom commence par SESS et collez-la ci-dessous sous la forme `SESSxxxx=valeur`.\n\nClub : {club} ({club_code})",
+        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration : collez votre cookie de session.\n\n1. Connectez-vous sur {site} dans votre navigateur.\n2. Ouvrez les outils de développement (F12), onglet Application (Chrome) ou Stockage (Firefox), puis Cookies > {site_url}.\n3. Copiez la valeur du cookie dont le nom commence par SESS et collez-la ci-dessous sous la forme `SESSxxxx=valeur`.\n\nClub : {club} ({club_code})",
         "data": { "cookie": "Cookie de session" }
       },
       "reauth_confirm": {
         "title": "Session Ten'Up expirée",
-        "description": "Reconnectez-vous sur tenup.fft.fr et collez un nouveau cookie SESS pour {club} ({club_code}).",
+        "description": "Reconnectez-vous sur {site} et collez un nouveau cookie SESS pour {club} ({club_code}).",
         "data": { "cookie": "Cookie de session" }
       }
     },
