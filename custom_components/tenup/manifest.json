@@ -1,5 +1,8 @@
 {
   "domain": "tenup",
+  "dependencies": [
+    "http"
+  ],
   "name": "Ten'Up",
   "codeowners": [
     "@ADNPolymerase"
