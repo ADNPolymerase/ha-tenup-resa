@@ -1,3 +1,5 @@
+<img src="custom_components/tenup/brand/logo.png" alt="Ten'Up" width="420">
+
 # Ten'Up for Home Assistant
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
@@ -68,3 +70,7 @@ Only slots that require a single player are bookable for now. Courts that requir
 ## Support
 
 Issues and ideas: [GitHub issues](https://github.com/ADNPolymerase/ha-tenup-resa/issues).
+
+---
+
+Ten'Up and the Ten'Up logo are trademarks of the Fédération Française de Tennis. This is an unofficial project, not affiliated with or endorsed by the FFT.

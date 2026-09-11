@@ -1,3 +1,5 @@
+<img src="custom_components/tenup/brand/logo.png" alt="Ten'Up" width="420">
+
 # Ten'Up pour Home Assistant
 
 Voir les courts libres de votre club de tennis sur [Ten'Up](https://tenup.fft.fr) (FFT) et réserver ou annuler un court depuis Home Assistant.
@@ -63,3 +65,7 @@ Seuls les créneaux à un joueur sont réservables pour l'instant. Les courts qu
 ## Support
 
 Bugs et idées : [GitHub issues](https://github.com/ADNPolymerase/ha-tenup-resa/issues).
+
+---
+
+Ten'Up et le logo Ten'Up sont des marques de la Fédération Française de Tennis. Ce projet non officiel n'est ni affilié à la FFT ni approuvé par elle.
