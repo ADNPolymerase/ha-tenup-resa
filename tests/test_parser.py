@@ -146,3 +146,32 @@ def test_cookie_candidates():
         cookie_candidates("not a cookie value!")
     with pytest.raises(ValueError):
         cookie_candidates("   ")
+
+
+def test_slot_marks_reflect_an_accepted_change():
+    """Ten'Up has already accepted: the cell must change without a refetch.
+
+    The coordinator debounces its refresh by about ten seconds and then refetches
+    every day, so without this the grid keeps showing the cancelled reservation
+    long enough that the card has to be reloaded by hand.
+    """
+    planning = parse_planning(load("planning.html"), date(2026, 9, 10), TZ)
+    by_id = {f"{s.court_id}_{s.hhmm}": s for s in planning.slots}
+
+    mine = by_id["21100_2100"]
+    assert mine.state == SLOT_MINE and mine.reservation_id == "165841846"
+    mine.mark_free()
+    assert mine.state == SLOT_FREE
+    assert mine.label is None
+    assert mine.reservation_id is None, "a freed cell must not keep a cancel target"
+    assert mine.cancel_path is None
+    assert mine.court_id == "21100" and mine.hhmm == "2100", "the cell itself does not move"
+
+    free = by_id["21099_1000"]
+    assert free.state == SLOT_FREE and free.book_path is not None
+    free.mark_mine()
+    assert free.state == SLOT_MINE
+    assert free.book_path is None, "a booked cell must not stay bookable"
+    # the reservation id only arrives with the next fetch; cancel falls back to
+    # court_id + start, which still points at this cell
+    assert free.reservation_id is None

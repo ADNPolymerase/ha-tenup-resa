@@ -62,6 +62,22 @@ class Slot:
         """Start time as HHMM, the key Ten'Up uses in cell ids and cancel URLs."""
         return self.start.strftime("%H%M")
 
+    def mark_mine(self) -> None:
+        """Ten'Up accepted a booking for this slot: show it as ours right away.
+
+        The reservation id only comes back with the next planning fetch, so the
+        cancel service falls back to court_id + start until then.
+        """
+        self.state = SLOT_MINE
+        self.book_path = None
+
+    def mark_free(self) -> None:
+        """Ten'Up accepted a cancellation: free the cell right away."""
+        self.state = SLOT_FREE
+        self.label = None
+        self.reservation_id = None
+        self.cancel_path = None
+
     def as_dict(self) -> dict[str, Any]:
         """Serializable form (for the websocket command and diagnostics)."""
         return {

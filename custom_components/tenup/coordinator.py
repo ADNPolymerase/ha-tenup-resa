@@ -153,9 +153,24 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
 
     async def async_book(self, slot: Slot) -> str:
         result = await self.client.async_book(slot)
+        self._apply_locally(slot.mark_mine)
         await self.async_request_refresh()
         return result
 
     async def async_cancel(self, slot: Slot) -> None:
         await self.client.async_cancel(slot)
+        self._apply_locally(slot.mark_free)
         await self.async_request_refresh()
+
+    def _apply_locally(self, change) -> None:
+        """Reflect a change Ten'Up has already accepted, without waiting.
+
+        async_request_refresh is debounced by about ten seconds and a full
+        refresh fetches every day again, so the grid kept showing the old state
+        long enough that the card had to be reloaded by hand. The call has
+        succeeded, so the cell is updated now and the background refresh only
+        reconciles afterwards.
+        """
+        change()
+        if self.data is not None:
+            self.async_set_updated_data(self.data)
