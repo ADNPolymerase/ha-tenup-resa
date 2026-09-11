@@ -174,6 +174,37 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             await session.close()
         return error, cookie
 
+    # ---------------------------------------------------------- reconfigure
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let the user hand over a new session without waiting for the old one to die.
+
+        Needed to move an existing setup to the longer lived shared cookie, and to
+        recover from a session revoked on the Ten'Up side (which looks fine to us
+        until the next refresh).
+        """
+        entry = self._get_reconfigure_entry()
+        self._club_code = entry.data[CONF_CLUB_CODE]
+        self._club_name = entry.data.get(CONF_CLUB_NAME)
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            error, cookie = await self._async_validate_cookie(
+                user_input[CONF_COOKIE], self._club_code
+            )
+            if error:
+                errors["base"] = error
+            else:
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_COOKIE: cookie}
+                )
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=STEP_COOKIE_SCHEMA,
+            errors=errors,
+            description_placeholders=self._placeholders(),
+        )
+
     # --------------------------------------------------------------- reauth
     async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
         self._club_code = entry_data[CONF_CLUB_CODE]

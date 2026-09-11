@@ -16,14 +16,21 @@
       },
       "cookie": {
         "title": "Ten'Up session",
-        "description": "Ten'Up does not allow logging in with a password from an integration, so paste your session cookie.\n\n1. Log in on {site} in your browser.\n2. Open the developer tools (F12), tab Application (Chrome) or Storage (Firefox), then Cookies > {site_url}.\n3. Copy the value of the cookie whose name starts with SESS and paste it below (the value alone is enough, `SESSxxxx=value` works too).\n\nClub: {club} ({club_code})",
+        "description": "Ten'Up does not allow logging in with a password from an integration, so it needs your session.\n\n1. **[Open Ten'Up]({site_url})** and **make sure you are logged in there** (your name should show at the top). Without that, the next steps give nothing.\n2. Click the Ten'Up bookmarklet (its line is in the README, to be created once): it puts the session in your clipboard.\n3. Come back here and paste it below.\n\nWithout the bookmarklet: developer tools (F12), Application tab, Cookies, then the value of the SHARED_SESSION_DRUPAL row. A \"Copy as cURL\" from the Network tab also works, pasted as is.\n\nOnly the useful cookie is kept, everything else is ignored and never stored.\n\nClub: {club} ({club_code})",
         "data": {
           "cookie": "Session cookie"
         }
       },
       "reauth_confirm": {
         "title": "Ten'Up session expired",
-        "description": "Log in again on {site} and paste a fresh SESS cookie for {club} ({club_code}).",
+        "description": "The Ten'Up session for {club} ({club_code}) is no longer accepted.\n\n1. **[Open Ten'Up]({site_url})** and **log in again** if needed.\n2. Click the Ten'Up bookmarklet: it puts the new session in your clipboard.\n3. Paste it below.",
+        "data": {
+          "cookie": "Session cookie"
+        }
+      },
+      "reconfigure": {
+        "title": "Ten'Up session",
+        "description": "Hand over a new session for {club} ({club_code}).\n\n1. **[Open Ten'Up]({site_url})** and **make sure you are logged in**.\n2. Click the Ten'Up bookmarklet: it puts the session in your clipboard.\n3. Paste it below.",
         "data": {
           "cookie": "Session cookie"
         }

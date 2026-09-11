@@ -16,14 +16,21 @@
       },
       "cookie": {
         "title": "Session Ten'Up",
-        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration : collez votre cookie de session.\n\n1. Connectez-vous sur {site} dans votre navigateur.\n2. Ouvrez les outils de développement (F12), onglet Application (Chrome) ou Stockage (Firefox), puis Cookies > {site_url}.\n3. Copiez la valeur du cookie dont le nom commence par SESS et collez-la ci-dessous (la valeur seule suffit, `SESSxxxx=valeur` marche aussi).\n\nClub : {club} ({club_code})",
+        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration : il faut lui passer votre session.\n\n1. **[Ouvrir Ten'Up]({site_url})** et **vérifiez que vous y êtes bien connecté** (votre nom doit apparaître en haut). Sans ça, les étapes suivantes ne donneront rien.\n2. Cliquez le marque-page Ten'Up (sa ligne est dans le README, à créer une seule fois) : il met la session dans votre presse-papier.\n3. Revenez ici et collez-la ci-dessous.\n\nSans marque-page : outils de développement (F12), onglet Appli, Cookies, puis la valeur de la ligne SHARED_SESSION_DRUPAL. Un « Copier en tant que cURL » depuis l'onglet Réseau marche aussi, collé tel quel.\n\nSeul le cookie utile est retenu, tout le reste est ignoré et n'est jamais enregistré.\n\nClub : {club} ({club_code})",
         "data": {
           "cookie": "Cookie de session"
         }
       },
       "reauth_confirm": {
         "title": "Session Ten'Up expirée",
-        "description": "Reconnectez-vous sur {site} et collez un nouveau cookie SESS pour {club} ({club_code}).",
+        "description": "La session Ten'Up de {club} ({club_code}) n'est plus acceptée.\n\n1. **[Ouvrir Ten'Up]({site_url})** et **reconnectez-vous** si besoin.\n2. Cliquez le marque-page Ten'Up : il met la nouvelle session dans votre presse-papier.\n3. Collez-la ci-dessous.",
+        "data": {
+          "cookie": "Cookie de session"
+        }
+      },
+      "reconfigure": {
+        "title": "Session Ten'Up",
+        "description": "Donnez une nouvelle session pour {club} ({club_code}).\n\n1. **[Ouvrir Ten'Up]({site_url})** et **vérifiez que vous y êtes connecté**.\n2. Cliquez le marque-page Ten'Up : il met la session dans votre presse-papier.\n3. Collez-la ci-dessous.",
         "data": {
           "cookie": "Cookie de session"
         }

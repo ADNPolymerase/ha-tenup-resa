@@ -187,3 +187,73 @@ def test_a_signed_out_drupal_page_still_raises_auth_error():
         await client.async_get_planning(date(2026, 9, 10))
     with pytest.raises(TenupAuthError):
         run(main)
+
+
+REAL_NAME = "SSESS7ba44afc36c80c3faa2b8fa87e7742c5"
+
+
+def test_session_cookie_reports_what_the_jar_holds():
+    async def main():
+        session = FakeSession({})
+        client = TenupClient(session, f"{REAL_NAME}=pasted", "87654321", TZ)
+        return client.session_cookie
+    assert run(main) == f"{REAL_NAME}=pasted"
+
+
+def test_session_cookie_follows_a_rotation_by_tenup():
+    """Drupal can hand out a new session id mid-flight: the config entry must follow."""
+    async def main():
+        session = FakeSession({})
+        client = TenupClient(session, f"{REAL_NAME}=old", "87654321", TZ)
+        session.cookie_jar.update_cookies(
+            {REAL_NAME: "rotated"}, URL("https://tenup.fft.fr")
+        )
+        return client.session_cookie
+    assert run(main) == f"{REAL_NAME}=rotated"
+
+
+def test_session_cookie_ignores_the_other_cookies():
+    """datadome and Queue-it also live in the jar and must never be saved as the session."""
+    async def main():
+        session = FakeSession({})
+        client = TenupClient(session, f"{REAL_NAME}=mine", "87654321", TZ)
+        session.cookie_jar.update_cookies(
+            {"datadome": "abc", "QueueITAccepted": "1", "_ga": "GA1.2"},
+            URL("https://tenup.fft.fr"),
+        )
+        return client.session_cookie
+    assert run(main) == f"{REAL_NAME}=mine"
+
+
+def test_session_cookie_is_none_without_a_drupal_session():
+    """A jar with no Drupal cookie must not make the coordinator overwrite anything."""
+    async def main():
+        session = FakeSession({})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        return client.session_cookie
+    assert run(main) is None
+
+
+SHARED_NAME = "SHARED_SESSION_DRUPAL"
+SHARED_VALUE = "aae6fe4e-0700-49d0-84ea-7b283f14affa"
+
+
+def test_session_cookie_prefers_the_shared_cookie():
+    """Drupal mints a new SSESS on every start: it must never replace the durable one."""
+    async def main():
+        session = FakeSession({})
+        client = TenupClient(session, f"{SHARED_NAME}={SHARED_VALUE}", "87654321", TZ)
+        session.cookie_jar.update_cookies(
+            {REAL_NAME: "minted-by-drupal"}, URL("https://tenup.fft.fr")
+        )
+        return client.session_cookie
+    assert run(main) == f"{SHARED_NAME}={SHARED_VALUE}"
+
+
+def test_session_cookie_falls_back_to_ssess_without_a_shared_cookie():
+    """Users set up before this existed keep working on their SSESS alone."""
+    async def main():
+        session = FakeSession({})
+        client = TenupClient(session, f"{REAL_NAME}=legacy", "87654321", TZ)
+        return client.session_cookie
+    assert run(main) == f"{REAL_NAME}=legacy"

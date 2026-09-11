@@ -16,6 +16,7 @@ from homeassistant.util import dt as dt_util
 from .api import TenupAuthError, TenupClient, TenupConnectionError
 from .const import (
     MAX_PLAYER_LOOKUPS,
+    CONF_COOKIE,
     CONF_DAYS_AHEAD,
     CONF_FRIENDS,
     CONF_SCAN_INTERVAL,
@@ -143,8 +144,23 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
             ) > planning.window_end:
                 break
         await self._annotate_required_players(data)
+        self._persist_rotated_cookie()
         data.fetched_at = dt_util.now()
         return data
+
+    def _persist_rotated_cookie(self) -> None:
+        """Write back the session cookie when Ten'Up has replaced it.
+
+        Only touches ``data``, never ``options``, so the update listener treats it
+        as a no-op and the integration is not reloaded behind the user's back.
+        """
+        current = self.client.session_cookie
+        if not current or current == self.entry.data.get(CONF_COOKIE):
+            return
+        _LOGGER.debug("Ten'Up handed out a new session cookie, saving it")
+        self.hass.config_entries.async_update_entry(
+            self.entry, data={**self.entry.data, CONF_COOKIE: current}
+        )
 
     async def _annotate_required_players(self, data: TenupData) -> None:
         """Tag each free slot with how many players its config needs (Couvert = 2, ...).

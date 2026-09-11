@@ -56,8 +56,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> boo
 
 async def _async_update_listener(hass: HomeAssistant, entry: TenupConfigEntry) -> None:
     coordinator = getattr(entry, "runtime_data", None)
+    # A cookie rotation saved by the coordinator also lands here, with the options
+    # untouched: it must not reload the integration in the middle of a refresh.
     if coordinator is not None and coordinator.absorb_friends(entry):
-        return  # only the friends list changed: nothing to refetch
+        return  # only the friends list or the stored cookie changed: nothing to refetch
     await hass.config_entries.async_reload(entry.entry_id)
 
 

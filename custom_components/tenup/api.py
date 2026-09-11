@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import date, datetime
 from http.cookies import SimpleCookie
 from typing import Any
@@ -70,6 +71,22 @@ _DOMAIN_HASHES = (
 )
 SESSION_COOKIE_NAMES = tuple(f"{prefix}{h}" for h in _DOMAIN_HASHES for prefix in ("SSESS", "SESS"))
 
+# Any Drupal 7 session cookie, whatever the domain hash, wherever it sits: the
+# user can paste a whole "Copy as cURL" command instead of hunting for the
+# value in the cookie storage view. The value stops at the first separator a
+# shell or a header would use.
+# Ten'Up bridges its Nuxt front and its Drupal back with a second cookie, which
+# is NOT HttpOnly and outlives the Drupal session by about a month. On its own it
+# is enough for Drupal to open a session, so it is the credential worth keeping:
+# the user can copy it without the developer tools, and Home Assistant mints a
+# fresh SSESS from it whenever it needs one.
+SHARED_COOKIE_NAME = "SHARED_SESSION_DRUPAL"
+_COOKIE_RE = re.compile(
+    r"\b(SHARED_SESSION_DRUPAL|S?SESS[0-9a-f]{32})=([^;,'\"\s]+)"
+)
+_SESSION_NAME_RE = re.compile(r"S?SESS[0-9a-f]{32}\Z")
+_UUID_RE = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\Z")
+
 
 def _clean_cookie_text(raw: str) -> str:
     text = " ".join(raw.replace("\r", " ").replace("\n", " ").split())
@@ -81,17 +98,32 @@ def _clean_cookie_text(raw: str) -> str:
 def cookie_candidates(raw: str) -> list[str]:
     """Return the ``name=value`` strings to try for what the user pasted.
 
-    ``SESSxxx=yyy`` and full ``Cookie:`` headers are returned as is. A bare value
-    (no ``=``) is combined with the known Drupal session cookie names.
+    A Drupal session cookie is pulled out of whatever it is buried in, so a
+    whole ``Copy as cURL`` command or a request headers dump can be pasted as
+    is. ``SESSxxx=yyy`` and full ``Cookie:`` headers are returned unchanged,
+    and a bare value (no ``=``) is combined with the known cookie names.
     """
     text = _clean_cookie_text(raw)
     if not text:
         raise ValueError("no cookie found")
+    found: list[str] = []
+    for name, value in _COOKIE_RE.findall(text):
+        pair = f"{name}={value}"
+        if pair not in found:
+            found.append(pair)
+    if found:
+        # The shared cookie lives longer, so try it first: it is the one we keep.
+        found.sort(key=lambda pair: not pair.startswith(f"{SHARED_COOKIE_NAME}="))
+        return found
     if "=" in text:
         return [text]
     if not text.replace("-", "").replace("_", "").isalnum():
         raise ValueError("not a cookie value")
-    return [f"{name}={text}" for name in SESSION_COOKIE_NAMES]
+    names = list(SESSION_COOKIE_NAMES)
+    if _UUID_RE.match(text):
+        # A bare UUID can only be the shared cookie.
+        names.insert(0, SHARED_COOKIE_NAME)
+    return [f"{name}={text}" for name in names]
 
 
 def parse_cookie_header(raw: str) -> dict[str, str]:
@@ -146,6 +178,25 @@ class TenupClient:
     def session(self) -> aiohttp.ClientSession:
         """The dedicated session (it carries the Ten'Up cookies)."""
         return self._session
+
+    @property
+    def session_cookie(self) -> str | None:
+        """The session cookie the jar holds now, as ``name=value``.
+
+        Ten'Up can hand out a new session id while we are using it (Drupal
+        regenerates one on its own terms). The jar follows, but the config entry
+        would still hold the value the user pasted, and the next restart of Home
+        Assistant would go back to it and ask for a cookie that never expired.
+        """
+        fallback: str | None = None
+        for morsel in self._jar:
+            if not morsel.value:
+                continue
+            if morsel.key == SHARED_COOKIE_NAME:
+                return f"{morsel.key}={morsel.value}"
+            if _SESSION_NAME_RE.match(morsel.key) and fallback is None:
+                fallback = f"{morsel.key}={morsel.value}"
+        return fallback
 
     # ------------------------------------------------------------------ session
     def set_cookie(self, cookie: str) -> None:

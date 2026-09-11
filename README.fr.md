@@ -30,9 +30,19 @@ L'intégration lit le tableau de réservation des adhérents (« Réserver dans 
 
 1. **Votre club** : tapez son nom et choisissez-le dans la liste (ou collez son code Ten'Up à 8 chiffres, visible dans l'URL du tableau de réservation).
 2. **Votre session** : Ten'Up n'autorise pas la connexion par mot de passe depuis un outil tiers (la page de connexion est protégée contre les connexions automatisées). L'intégration utilise donc la session de votre navigateur :
-   - connectez-vous sur tenup.fft.fr,
-   - ouvrez les outils de développement (F12) > Application (Chrome) ou Stockage (Firefox) > Cookies > `https://tenup.fft.fr`,
-   - copiez le cookie dont le nom commence par `SESS` et collez-le sous la forme `SESSxxxx=valeur`.
+   **Le plus simple, sans outils de développement.** Créez un marque-page dont l'adresse est la ligne ci-dessous, connectez-vous sur tenup.fft.fr, puis cliquez dessus : il met la session dans votre presse-papier, vous n'avez plus qu'à la coller dans Home Assistant. Si le navigateur refuse le presse-papier, il affiche la valeur à copier.
+
+   ```javascript
+   javascript:(function(){var m=document.cookie.match(/(?:^|;\s*)SHARED_SESSION_DRUPAL=([^;]+)/);if(!m){alert("Connectez-vous d'abord sur tenup.fft.fr, puis recliquez.");return}var v="SHARED_SESSION_DRUPAL="+m[1];function f(){prompt("Collez ceci dans Home Assistant:",v)}try{navigator.clipboard.writeText(v).then(function(){alert("Session copiee. Collez-la dans Home Assistant (Ctrl+V ou Cmd+V).")},f)}catch(e){f()}})()
+   ```
+
+   Ce marque-page lit `SHARED_SESSION_DRUPAL`, le cookie qui relie le site à son espace de réservation. Il n'est pas `HttpOnly`, donc un script de page peut le lire, et il vit environ **deux mois**. Home Assistant s'en sert pour ouvrir une session quand il en a besoin, ce qui espace d'autant les recollages.
+
+   **Sans marque-page**, la valeur se lit dans les outils de développement (F12) > onglet Appli > Cookies > `https://tenup.fft.fr` :
+
+   <img src="docs/cookie-devtools.fr.png" alt="La ligne SHARED_SESSION_DRUPAL dans les cookies" width="760">
+
+   Au choix aussi : onglet Réseau > clic droit sur une ligne > Copier > **Copier en tant que cURL**, et collez le tout. L'intégration ne retient que le cookie utile : adresses, en-têtes et autres cookies sont ignorés et ne sont jamais enregistrés.
 
 Quand la session expire, Home Assistant affiche une réparation qui demande un cookie frais. Aucun mot de passe n'est jamais stocké.
 

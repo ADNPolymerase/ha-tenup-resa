@@ -35,9 +35,19 @@ The integration reads the member reservation grid of your club (`Réserver dans 
 
 1. **Your club**: type its name, pick it in the list (or paste its 8-digit Ten'Up code, visible in the URL of the reservation grid).
 2. **Your session**: Ten'Up does not allow logging in with a password from a third-party tool (the login page is protected against automated logins), so the integration works with the session of your browser:
-   - log in on tenup.fft.fr,
-   - open the developer tools (F12) > Application (Chrome) or Storage (Firefox) > Cookies > `https://tenup.fft.fr`,
-   - copy the cookie whose name starts with `SESS` and paste it as `SESSxxxx=value`.
+   **The easy way, no developer tools.** Create a bookmark whose address is the line below, log in on tenup.fft.fr, then click it: it puts the session in your clipboard, you only have to paste it into Home Assistant. If the browser refuses clipboard access, it shows the value to copy.
+
+   ```javascript
+   javascript:(function(){var m=document.cookie.match(/(?:^|;\s*)SHARED_SESSION_DRUPAL=([^;]+)/);if(!m){alert("Log in on tenup.fft.fr first, then click again.");return}var v="SHARED_SESSION_DRUPAL="+m[1];function f(){prompt("Paste this into Home Assistant:",v)}try{navigator.clipboard.writeText(v).then(function(){alert("Session copied. Paste it into Home Assistant (Ctrl+V or Cmd+V).")},f)}catch(e){f()}})()
+   ```
+
+   The bookmarklet reads `SHARED_SESSION_DRUPAL`, the cookie that bridges the site and its reservation area. It is not `HttpOnly`, so a page script can read it, and it lives for about **two months**. Home Assistant uses it to open a session whenever it needs one, so you re-paste far less often.
+
+   **Without the bookmarklet**, the value is in the developer tools (F12) > Application tab > Cookies > `https://tenup.fft.fr`:
+
+   <img src="docs/cookie-devtools.png" alt="The SHARED_SESSION_DRUPAL row in the cookies" width="760">
+
+   Or: Network tab > right-click a row > Copy > **Copy as cURL**, and paste the whole thing. The integration keeps only the useful cookie: URLs, headers and other cookies are ignored and never stored.
 
 When the session expires, Home Assistant raises a repair asking for a fresh cookie. No password is ever stored.
 
