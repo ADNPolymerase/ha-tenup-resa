@@ -1,17 +1,17 @@
 {
   "domain": "tenup",
-  "dependencies": [
-    "http"
-  ],
   "name": "Ten'Up",
   "codeowners": [
     "@ADNPolymerase"
   ],
   "config_flow": true,
+  "dependencies": [
+    "http"
+  ],
   "documentation": "https://github.com/ADNPolymerase/ha-tenup-resa",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/ADNPolymerase/ha-tenup-resa/issues",
   "requirements": [],
-  "version": "0.4.0"
+  "version": "0.4.1"
 }

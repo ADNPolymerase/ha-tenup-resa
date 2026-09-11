@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Manifest keys put back in the order hassfest wants (`domain`, `name`, then
+  alphabetical). 0.4.0 shipped `dependencies` before `name`, which fails validation.
+
 ## 0.4.0
 
 First published release.
