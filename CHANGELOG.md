@@ -8,6 +8,9 @@
   about two months instead of the twenty three days of the Drupal session. Home
   Assistant opens a session from it whenever it needs one. A setup pasted before this
   keeps working on its `SESS` cookie.
+- Setup: every step that asks for a session is now three numbered steps: a link that
+  opens Ten'Up to log in, the bookmarklet that copies the session, and the field to
+  paste it in.
 - Setup: every step that asks for a session now opens with a link to Ten'Up and a
   reminder to be logged in there first, and the bookmarklet copies the session to the
   clipboard instead of showing it.
