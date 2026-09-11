@@ -8,7 +8,9 @@ from custom_components.tenup.const import SLOT_BUSY, SLOT_FREE, SLOT_MINE
 from custom_components.tenup.parser import (
     TenupParseError,
     extract_drupal_settings,
+    interstitial_reason,
     is_logged_in,
+    looks_signed_out,
     parse_book_path,
     parse_booking_form,
     parse_messages,
@@ -175,3 +177,42 @@ def test_slot_marks_reflect_an_accepted_change():
     # the reservation id only arrives with the next fetch; cancel falls back to
     # court_id + start, which still points at this cell
     assert free.reservation_id is None
+
+
+QUEUE_PAGE = (
+    '<!doctype html><html><head><title>Ten\'Up</title>'
+    '<script src="https://static.queue-it.net/script/queueclient.min.js"></script></head>'
+    '<body><div id="qit">Vous etes en file d\'attente</div></body></html>'
+)
+BOT_PAGE = (
+    '<!doctype html><html><head><script src="https://ct.captcha-delivery.com/c.js"></script>'
+    '</head><body><div id="datadome-captcha"></div></body></html>'
+)
+SIGNED_OUT = '<!doctype html><html><body class="html not-front not-logged-in page-user">' \
+             '<h1>Connexion</h1></body></html>'
+
+
+def test_only_a_drupal_page_proves_the_cookie_is_dead():
+    """A waiting room or a bot wall says nothing about the session.
+
+    Treating "no logged-in marker" as an expired cookie tore the config entry
+    down and made the user paste a new cookie for nothing.
+    """
+    planning = load("planning.html")
+    assert is_logged_in(planning) and not looks_signed_out(planning)
+
+    assert looks_signed_out(SIGNED_OUT), "an anonymous Drupal page is the only proof"
+    assert not is_logged_in(SIGNED_OUT)
+
+    for page in (QUEUE_PAGE, BOT_PAGE):
+        assert not is_logged_in(page)
+        assert not looks_signed_out(page), "an interstitial must never read as signed out"
+
+
+def test_interstitial_is_named_for_the_log():
+    assert interstitial_reason(QUEUE_PAGE) == "the Queue-it waiting room"
+    assert interstitial_reason("<html><body>rien</body></html>",
+                               "https://tenup.queue-it.net/?c=tenup") == "the Queue-it waiting room"
+    assert interstitial_reason(BOT_PAGE) == "a bot challenge"
+    assert interstitial_reason("<html><p>oups</p></html>") == "a page carrying no Drupal session marker"
+    assert interstitial_reason('<html><body class="html front">x</body></html>') == "an unexpected page"

@@ -91,6 +91,7 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         self._players_cache: dict[str, int] = {}
         self._store: Store = Store(hass, 1, f"{DOMAIN}_players_{entry.entry_id}")
         self._cache_loaded = False
+        self._auth_failures = 0
 
     @property
     def days_ahead(self) -> int:
@@ -109,12 +110,18 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
             try:
                 planning = await self.client.async_get_planning(day)
             except TenupAuthError as err:
+                # One refusal is not proof: ask the user for a new cookie only
+                # once Ten'Up has said it twice in a row.
+                self._auth_failures += 1
+                if self._auth_failures < 2:
+                    raise UpdateFailed(f"{err} (retrying before asking to sign in again)") from err
                 raise ConfigEntryAuthFailed(str(err)) from err
             except TenupConnectionError as err:
                 if data.plannings:
                     _LOGGER.warning("Ten'Up: stopping at %s: %s", day, err)
                     break
                 raise UpdateFailed(str(err)) from err
+            self._auth_failures = 0
             data.plannings[day] = planning
             if planning.window_end and datetime.combine(
                 day + timedelta(days=1), datetime.min.time(), planning.window_end.tzinfo

@@ -18,7 +18,9 @@ from .parser import (
     Planning,
     Slot,
     TenupParseError,
+    interstitial_reason,
     is_logged_in,
+    looks_signed_out,
     parse_booking_form,
     parse_messages,
     parse_planning,
@@ -239,9 +241,17 @@ class TenupClient:
         )
         if status >= 500:
             raise TenupConnectionError(f"Ten'Up answered {status} on {path}")
-        if not is_logged_in(body):
+        if is_logged_in(body):
+            return body, final_url
+        # Only a Drupal page that says so proves the cookie is dead. Ten'Up also
+        # answers ordinary requests with a Queue-it waiting room or a bot
+        # challenge, and treating those as an expired session tore the entry
+        # down and made the user paste a new cookie for nothing.
+        if looks_signed_out(body):
             raise TenupAuthError("Ten'Up session is not logged in (cookie expired?)")
-        return body, final_url
+        raise TenupConnectionError(
+            f"Ten'Up answered with {interstitial_reason(body, str(final_url))} on {path}"
+        )
 
     # ----------------------------------------------------------------- planning
     async def async_get_planning(self, day: date) -> Planning:

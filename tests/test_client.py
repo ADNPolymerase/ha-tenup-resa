@@ -146,3 +146,44 @@ def test_required_players_is_none_on_garbage():
         client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
         return await client.async_required_players("/club/reservation_court_add/nojs/9/9/1/2")
     assert run(main) is None
+
+
+QUEUE_BODY = ('<!doctype html><html><head>'
+              '<script src="https://static.queue-it.net/script/queueclient.min.js"></script>'
+              '</head><body><div>file d\'attente</div></body></html>')
+BOT_BODY = ('<!doctype html><html><head>'
+            '<script src="https://ct.captcha-delivery.com/c.js"></script>'
+            '</head><body><div id="datadome-captcha"></div></body></html>')
+
+
+@pytest.mark.parametrize("body, wall", [(QUEUE_BODY, "Queue-it"), (BOT_BODY, "bot challenge")])
+def test_an_interstitial_is_transient_not_an_expired_cookie(body, wall):
+    """Ten'Up serves these from its own host, so the queue-host check misses them.
+
+    They used to raise TenupAuthError, which HA turns into ConfigEntryAuthFailed:
+    the entry was torn down and a fresh cookie demanded although the session was
+    still perfectly valid.
+    """
+    async def main():
+        session = FakeSession({("GET", "/reservations/"): [
+            FakeResponse(body, "https://tenup.fft.fr/club/87654321/reservations/20260910")]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_get_planning(date(2026, 9, 10))
+
+    with pytest.raises(TenupConnectionError) as excinfo:
+        run(main)
+    assert wall in str(excinfo.value)
+    # and emphatically not the fatal one
+    assert not isinstance(excinfo.value, TenupAuthError)
+
+
+def test_a_signed_out_drupal_page_still_raises_auth_error():
+    """The one case that really does need a new cookie must keep working."""
+    async def main():
+        body = '<!doctype html><html><body class="html not-logged-in">Connexion</body></html>'
+        session = FakeSession({("GET", "/reservations/"): [
+            FakeResponse(body, "https://tenup.fft.fr/club/87654321/reservations/20260910")]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_get_planning(date(2026, 9, 10))
+    with pytest.raises(TenupAuthError):
+        run(main)

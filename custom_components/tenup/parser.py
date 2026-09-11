@@ -223,6 +223,38 @@ def is_logged_in(html: str) -> bool:
     return "logged-in" in classes and "not-logged-in" not in classes
 
 
+def looks_signed_out(html: str) -> bool:
+    """True only for a real Drupal page that states the visitor is anonymous.
+
+    This is the single piece of evidence that the cookie is actually dead.
+    Anything else (a waiting room, a bot challenge, an error page) proves
+    nothing about the session and must not cost the user a new cookie.
+    """
+    return "not-logged-in" in body_classes(html)
+
+
+_QUEUE_MARKERS = ("queue-it.net", "queueit", "queue-it")
+_BOT_MARKERS = ("captcha-delivery.com", "datadome", "geo.captcha")
+
+
+def interstitial_reason(html: str, final_url: str = "") -> str:
+    """Name the wall Ten'Up put in front of the page, for the log message.
+
+    Only ever used once the page is known not to be the signed-in planning and
+    not a signed-out Drupal page, so a marker matched here cannot mask a real
+    logout. Interstitials are small and announce themselves early, hence the
+    slice.
+    """
+    haystack = f"{final_url}\n{html[:4000]}".lower()
+    if any(marker in haystack for marker in _QUEUE_MARKERS):
+        return "the Queue-it waiting room"
+    if any(marker in haystack for marker in _BOT_MARKERS):
+        return "a bot challenge"
+    if not _BODY_RE.search(html):
+        return "a page carrying no Drupal session marker"
+    return "an unexpected page"
+
+
 def parse_planning(html: str, day: date, tzinfo: Any) -> Planning:
     """Parse ``/club/{code}/reservations/{YYYYMMDD}``."""
     parser = _PlanningHTMLParser()
