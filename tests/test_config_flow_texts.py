@@ -95,6 +95,25 @@ def test_the_first_step_points_at_the_club_grid(monkeypatch):
     assert values["club_url"][-8:].isdigit()
 
 
+def test_the_grid_link_follows_each_users_own_club(monkeypatch):
+    """Two installs, two clubs, two links: the code comes from the entry."""
+    urls = set()
+    for code in ("87654321", "12345678"):
+        flow = make_flow(monkeypatch=monkeypatch)
+        flow._club_code = code
+        url = flow._placeholders()["club_url"]
+        assert f"/club/{code}/reservations/" in url, code
+        urls.add(url)
+    assert len(urls) == 2
+
+
+def test_no_club_code_stays_on_the_site(monkeypatch):
+    """Never build a /club/None/ address."""
+    flow = make_flow(monkeypatch=monkeypatch)
+    flow._club_code = None
+    assert flow._placeholders()["club_url"] == "https://tenup.fft.fr"
+
+
 def test_the_bookmarklet_says_where_to_be(monkeypatch):
     """Its failure message is the only guidance a user gets on the wrong page."""
     fr = make_flow(monkeypatch=monkeypatch)._placeholders()["bookmarklet"]

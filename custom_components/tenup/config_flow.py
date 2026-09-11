@@ -163,11 +163,15 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             "club_code": self._club_code or "",
             "site": "tenup.fft.fr",
             "site_url": "https://tenup.fft.fr",
-            # Straight to the club grid: the shared cookie only exists inside the
-            # reservation area, not on the Ten'Up home page.
+            # Straight to this entry's own club grid: the shared cookie only
+            # exists inside the reservation area, not on the Ten'Up home page.
+            # Without a club code there is no grid to aim at, so stay on the site
+            # rather than build a /club/None/ address.
             "club_url": (
                 f"https://tenup.fft.fr/club/{self._club_code}/reservations/"
                 f"{dt_util.now():%Y%m%d}"
+                if self._club_code
+                else "https://tenup.fft.fr"
             ),
             # Shown in the dialog itself: the user has the line under their eyes,
             # with no page to open and nothing to go and look for.
