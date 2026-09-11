@@ -15,7 +15,6 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -38,7 +37,7 @@ from .api import (
     new_session,
     parse_cookie_header,
 )
-from .http import BOOKMARKLET, BOOKMARKLET_URL, EN, FR
+from .http import BOOKMARKLET, EN, FR
 from .const import (
     CONF_CLUB_CODE,
     CONF_CLUB_NAME,
@@ -144,20 +143,10 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
     def _placeholders(self) -> dict[str, str]:
         language = (self.hass.config.language or "en").lower()
         texts = FR if language.startswith("fr") else EN
-        try:
-            base = get_url(self.hass)
-        except NoURLAvailableError:
-            base = ""
-        # An instance that does not know its own address (both URLs unset in
-        # Settings > System > Network) would give a link that leads nowhere, and
-        # a relative path is not turned into a link by the frontend at all. Drop
-        # the whole sentence rather than show a dead link: the line itself is in
-        # the dialog, so nothing is lost.
-        page = (
-            "\n\n" + texts["page_link"].format(url=f"{base}{BOOKMARKLET_URL}")
-            if base.startswith(("http://", "https://"))
-            else ""
-        )
+        # No link to the install page here on purpose. It sits on the Home
+        # Assistant origin, so the frontend router catches the click, does not
+        # know the path, and lands the user on their default dashboard. The line
+        # to copy is in the dialog itself, which is what the page was for.
         return {
             "club": self._club_name or "",
             "club_code": self._club_code or "",
@@ -176,7 +165,6 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             # Shown in the dialog itself: the user has the line under their eyes,
             # with no page to open and nothing to go and look for.
             "bookmarklet": BOOKMARKLET % texts,
-            "install_page": page,
         }
 
     async def _async_validate_cookie(self, cookie: str, club_code: str) -> tuple[str | None, str]:

@@ -23,12 +23,11 @@ def descriptions():
             yield name, step, body.get("description", "")
 
 
-def make_flow(language="fr", url="http://homeassistant.local:8123", monkeypatch=None):
+def make_flow(language="fr", monkeypatch=None):
     flow = cf.TenupConfigFlow()
     flow._club_code = "87654321"
     flow._club_name = "DEMO"
     flow.hass = SimpleNamespace(config=SimpleNamespace(language=language))
-    monkeypatch.setattr(cf, "get_url", lambda hass: url)
     return flow
 
 
@@ -49,30 +48,12 @@ def test_every_description_renders(monkeypatch):
             assert "javascript:(function()" in rendered, (name, step)
 
 
-def test_the_page_link_is_absolute(monkeypatch):
-    """A relative path is not turned into a link by the frontend."""
-    values = make_flow(monkeypatch=monkeypatch)._placeholders()
-    assert "(http://homeassistant.local:8123/api/tenup/bookmarklet)" in values["install_page"]
-
-
-def test_no_link_at_all_when_home_assistant_ignores_its_own_address(monkeypatch):
-    """Both URLs unset is common: a dead link is worse than no link."""
-    monkeypatch.setattr(cf, "get_url", lambda hass: "")
-    flow = cf.TenupConfigFlow()
-    flow.hass = SimpleNamespace(config=SimpleNamespace(language="fr"))
-    assert flow._placeholders()["install_page"] == ""
-
-
-def test_a_relative_url_is_never_offered_as_a_link(monkeypatch):
-    """The exact bug: get_url raising left a relative path behind."""
-    def boom(hass):
-        raise cf.NoURLAvailableError
-    monkeypatch.setattr(cf, "get_url", boom)
-    flow = cf.TenupConfigFlow()
-    flow.hass = SimpleNamespace(config=SimpleNamespace(language="fr"))
-    values = flow._placeholders()
-    assert values["install_page"] == ""
-    assert "/api/tenup/bookmarklet" not in values["install_page"]
+def test_no_link_points_back_at_home_assistant(monkeypatch):
+    """A same-origin link is swallowed by the frontend router, which lands the
+    user on their default dashboard instead of the page."""
+    for name, step, text in descriptions():
+        assert "/api/tenup/" not in text, (name, step)
+        assert "install_page" not in text, (name, step)
 
 
 def test_the_bookmarklet_is_shown_in_the_dialog(monkeypatch):
@@ -120,11 +101,3 @@ def test_the_bookmarklet_says_where_to_be(monkeypatch):
     assert "Reserver dans mon club" in fr
 
 
-def test_a_missing_home_assistant_url_does_not_break_the_dialog(monkeypatch):
-    """The line to copy must survive, it is the part that always works."""
-    def boom(hass):
-        raise cf.NoURLAvailableError
-    monkeypatch.setattr(cf, "get_url", boom)
-    flow = cf.TenupConfigFlow()
-    flow.hass = SimpleNamespace(config=SimpleNamespace(language="fr"))
-    assert flow._placeholders()["bookmarklet"].startswith("javascript:")

@@ -47,8 +47,6 @@ FR = {
               "au collage.",
     "copy": "Copier la ligne",
     "done": "Copi\u00e9",
-    "page_link": "Plus simple encore, [cette page]({url}) vous laisse le glisser "
-                 "directement dans votre barre de favoris.",
     "use": "Ensuite, \u00e0 chaque fois",
     "steps": [
         "Sur tenup.fft.fr, connectez-vous et ouvrez <b>R\u00e9server dans mon club</b>.",
@@ -72,8 +70,6 @@ EN = {
               "pasted.",
     "copy": "Copy the line",
     "done": "Copied",
-    "page_link": "Easier still, [this page]({url}) lets you drag it straight to "
-                 "your bookmarks bar.",
     "use": "Then, every time",
     "steps": [
         "On tenup.fft.fr, log in and open <b>Book at my club</b>.",
