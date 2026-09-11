@@ -8,6 +8,10 @@
   about two months instead of the twenty three days of the Drupal session. Home
   Assistant opens a session from it whenever it needs one. A setup pasted before this
   keeps working on its `SESS` cookie.
+- Setup: the first step links straight to the club reservation grid and says the
+  bookmarklet only works from there, since the shared cookie does not exist on the
+  Ten'Up home page. The link to the install page is dropped when Home Assistant has
+  no URL of its own configured, rather than shown dead.
 - Setup: the bookmarklet line is shown in the dialog itself, so it can be copied
   without leaving it, and the link to the install page is absolute (a relative one
   is not turned into a link by the frontend).

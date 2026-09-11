@@ -32,7 +32,7 @@ BOOKMARKLET = (
 FR = {
     # Les textes du marque-page restent sans accent: ils partent dans une URL
     # javascript: que le navigateur transporte telle quelle jusqu'au favori.
-    "signed_out": "Connectez-vous d'abord sur tenup.fft.fr, puis recliquez.",
+    "signed_out": "Ouvrez d'abord Reserver dans mon club sur tenup.fft.fr, connectez-vous, puis recliquez ici.",
     "paste": "Collez ceci dans Home Assistant:",
     "copied": "Session copiee. Collez-la dans Home Assistant (Ctrl+V ou Cmd+V).",
     "title": "Marque-page Ten'Up",
@@ -47,15 +47,17 @@ FR = {
               "au collage.",
     "copy": "Copier la ligne",
     "done": "Copi\u00e9",
+    "page_link": "Plus simple encore, [cette page]({url}) vous laisse le glisser "
+                 "directement dans votre barre de favoris.",
     "use": "Ensuite, \u00e0 chaque fois",
     "steps": [
-        "Connectez-vous sur tenup.fft.fr.",
+        "Sur tenup.fft.fr, connectez-vous et ouvrez <b>R\u00e9server dans mon club</b>.",
         "Cliquez le favori <b>Session Ten'Up</b> : il copie votre session.",
         "Collez-la dans Home Assistant.",
     ],
 }
 EN = {
-    "signed_out": "Log in on tenup.fft.fr first, then click again.",
+    "signed_out": "Open Book at my club on tenup.fft.fr first, log in, then click here again.",
     "paste": "Paste this into Home Assistant:",
     "copied": "Session copied. Paste it into Home Assistant (Ctrl+V or Cmd+V).",
     "title": "Ten'Up bookmarklet",
@@ -70,9 +72,11 @@ EN = {
               "pasted.",
     "copy": "Copy the line",
     "done": "Copied",
+    "page_link": "Easier still, [this page]({url}) lets you drag it straight to "
+                 "your bookmarks bar.",
     "use": "Then, every time",
     "steps": [
-        "Log in on tenup.fft.fr.",
+        "On tenup.fft.fr, log in and open <b>Book at my club</b>.",
         "Click the <b>Ten'Up session</b> bookmark: it copies your session.",
         "Paste it into Home Assistant.",
     ],

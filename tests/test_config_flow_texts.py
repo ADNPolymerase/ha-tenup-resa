@@ -52,8 +52,27 @@ def test_every_description_renders(monkeypatch):
 def test_the_page_link_is_absolute(monkeypatch):
     """A relative path is not turned into a link by the frontend."""
     values = make_flow(monkeypatch=monkeypatch)._placeholders()
-    assert values["bookmarklet_url"].startswith("http")
-    assert values["bookmarklet_url"].endswith("/api/tenup/bookmarklet")
+    assert "(http://homeassistant.local:8123/api/tenup/bookmarklet)" in values["install_page"]
+
+
+def test_no_link_at_all_when_home_assistant_ignores_its_own_address(monkeypatch):
+    """Both URLs unset is common: a dead link is worse than no link."""
+    monkeypatch.setattr(cf, "get_url", lambda hass: "")
+    flow = cf.TenupConfigFlow()
+    flow.hass = SimpleNamespace(config=SimpleNamespace(language="fr"))
+    assert flow._placeholders()["install_page"] == ""
+
+
+def test_a_relative_url_is_never_offered_as_a_link(monkeypatch):
+    """The exact bug: get_url raising left a relative path behind."""
+    def boom(hass):
+        raise cf.NoURLAvailableError
+    monkeypatch.setattr(cf, "get_url", boom)
+    flow = cf.TenupConfigFlow()
+    flow.hass = SimpleNamespace(config=SimpleNamespace(language="fr"))
+    values = flow._placeholders()
+    assert values["install_page"] == ""
+    assert "/api/tenup/bookmarklet" not in values["install_page"]
 
 
 def test_the_bookmarklet_is_shown_in_the_dialog(monkeypatch):
@@ -65,16 +84,28 @@ def test_the_bookmarklet_is_shown_in_the_dialog(monkeypatch):
 def test_the_bookmarklet_follows_the_home_assistant_language(monkeypatch):
     fr = make_flow(language="fr", monkeypatch=monkeypatch)._placeholders()["bookmarklet"]
     en = make_flow(language="en", monkeypatch=monkeypatch)._placeholders()["bookmarklet"]
-    assert "Connectez-vous" in fr and "Connectez-vous" not in en
-    assert "Log in on" in en and "Log in on" not in fr
+    assert "Reserver dans mon club" in fr and "Reserver dans mon club" not in en
+    assert "Book at my club" in en and "Book at my club" not in fr
+
+
+def test_the_first_step_points_at_the_club_grid(monkeypatch):
+    """The shared cookie only exists inside the reservation area."""
+    values = make_flow(monkeypatch=monkeypatch)._placeholders()
+    assert values["club_url"].startswith("https://tenup.fft.fr/club/87654321/reservations/")
+    assert values["club_url"][-8:].isdigit()
+
+
+def test_the_bookmarklet_says_where_to_be(monkeypatch):
+    """Its failure message is the only guidance a user gets on the wrong page."""
+    fr = make_flow(monkeypatch=monkeypatch)._placeholders()["bookmarklet"]
+    assert "Reserver dans mon club" in fr
 
 
 def test_a_missing_home_assistant_url_does_not_break_the_dialog(monkeypatch):
+    """The line to copy must survive, it is the part that always works."""
     def boom(hass):
         raise cf.NoURLAvailableError
     monkeypatch.setattr(cf, "get_url", boom)
     flow = cf.TenupConfigFlow()
     flow.hass = SimpleNamespace(config=SimpleNamespace(language="fr"))
-    values = flow._placeholders()
-    assert values["bookmarklet_url"] == "/api/tenup/bookmarklet"
-    assert values["bookmarklet"].startswith("javascript:")
+    assert flow._placeholders()["bookmarklet"].startswith("javascript:")

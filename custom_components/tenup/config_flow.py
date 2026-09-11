@@ -148,15 +148,31 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             base = get_url(self.hass)
         except NoURLAvailableError:
             base = ""
+        # An instance that does not know its own address (both URLs unset in
+        # Settings > System > Network) would give a link that leads nowhere, and
+        # a relative path is not turned into a link by the frontend at all. Drop
+        # the whole sentence rather than show a dead link: the line itself is in
+        # the dialog, so nothing is lost.
+        page = (
+            "\n\n" + texts["page_link"].format(url=f"{base}{BOOKMARKLET_URL}")
+            if base.startswith(("http://", "https://"))
+            else ""
+        )
         return {
             "club": self._club_name or "",
             "club_code": self._club_code or "",
             "site": "tenup.fft.fr",
             "site_url": "https://tenup.fft.fr",
+            # Straight to the club grid: the shared cookie only exists inside the
+            # reservation area, not on the Ten'Up home page.
+            "club_url": (
+                f"https://tenup.fft.fr/club/{self._club_code}/reservations/"
+                f"{dt_util.now():%Y%m%d}"
+            ),
             # Shown in the dialog itself: the user has the line under their eyes,
             # with no page to open and nothing to go and look for.
             "bookmarklet": BOOKMARKLET % texts,
-            "bookmarklet_url": f"{base}{BOOKMARKLET_URL}",
+            "install_page": page,
         }
 
     async def _async_validate_cookie(self, cookie: str, club_code: str) -> tuple[str | None, str]:
