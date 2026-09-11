@@ -4,21 +4,29 @@
       "user": {
         "title": "Your club",
         "description": "Type the name of your club (or its 8-digit Ten'Up code).",
-        "data": { "query": "Club name or code" }
+        "data": {
+          "query": "Club name or code"
+        }
       },
       "club": {
         "title": "Pick your club",
-        "data": { "club": "Club" }
+        "data": {
+          "club": "Club"
+        }
       },
       "cookie": {
         "title": "Ten'Up session",
         "description": "Ten'Up does not allow logging in with a password from an integration, so paste your session cookie.\n\n1. Log in on {site} in your browser.\n2. Open the developer tools (F12), tab Application (Chrome) or Storage (Firefox), then Cookies > {site_url}.\n3. Copy the value of the cookie whose name starts with SESS and paste it below (the value alone is enough, `SESSxxxx=value` works too).\n\nClub: {club} ({club_code})",
-        "data": { "cookie": "Session cookie" }
+        "data": {
+          "cookie": "Session cookie"
+        }
       },
       "reauth_confirm": {
         "title": "Ten'Up session expired",
         "description": "Log in again on {site} and paste a fresh SESS cookie for {club} ({club_code}).",
-        "data": { "cookie": "Session cookie" }
+        "data": {
+          "cookie": "Session cookie"
+        }
       }
     },
     "error": {
@@ -38,21 +46,37 @@
       "init": {
         "data": {
           "days_ahead": "Days to fetch",
-          "scan_interval": "Refresh interval"
+          "scan_interval": "Refresh interval",
+          "friends": "Friends to highlight"
+        },
+        "data_description": {
+          "friends": "Surnames as Ten'Up writes them. Their bookings show in purple. Three characters minimum."
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "free_slots_today": { "name": "Free slots today" },
-      "free_slots": { "name": "Free slots" },
-      "next_free_slot": { "name": "Next free slot" },
-      "next_reservation": { "name": "Next reservation" },
-      "my_reservations": { "name": "My reservations" }
+      "free_slots_today": {
+        "name": "Free slots today"
+      },
+      "free_slots": {
+        "name": "Free slots"
+      },
+      "next_free_slot": {
+        "name": "Next free slot"
+      },
+      "next_reservation": {
+        "name": "Next reservation"
+      },
+      "my_reservations": {
+        "name": "My reservations"
+      }
     },
     "calendar": {
-      "reservations": { "name": "Reservations" }
+      "reservations": {
+        "name": "Reservations"
+      }
     }
   },
   "services": {
@@ -60,27 +84,58 @@
       "name": "Book a court",
       "description": "Books a free slot for the account owner (single-player courts only for now).",
       "fields": {
-        "entry_id": { "name": "Club", "description": "Which Ten'Up entry to use (first one if omitted)." },
-        "court_id": { "name": "Court id", "description": "Ten'Up court id, see the planning attributes (e.g. 21100)." },
-        "start": { "name": "Start", "description": "Start of the slot, local time." }
+        "entry_id": {
+          "name": "Club",
+          "description": "Which Ten'Up entry to use (first one if omitted)."
+        },
+        "court_id": {
+          "name": "Court id",
+          "description": "Ten'Up court id, see the planning attributes (e.g. 21100)."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Start of the slot, local time."
+        }
       }
     },
     "cancel": {
       "name": "Cancel a reservation",
       "description": "Cancels one of your reservations. Ten'Up does not ask for confirmation.",
       "fields": {
-        "entry_id": { "name": "Club", "description": "Which Ten'Up entry to use (first one if omitted)." },
-        "reservation_id": { "name": "Reservation id", "description": "From the calendar or the sensors attributes." },
-        "court_id": { "name": "Court id", "description": "Alternative to the reservation id, together with start." },
-        "start": { "name": "Start", "description": "Alternative to the reservation id, together with court id." }
+        "entry_id": {
+          "name": "Club",
+          "description": "Which Ten'Up entry to use (first one if omitted)."
+        },
+        "reservation_id": {
+          "name": "Reservation id",
+          "description": "From the calendar or the sensors attributes."
+        },
+        "court_id": {
+          "name": "Court id",
+          "description": "Alternative to the reservation id, together with start."
+        },
+        "start": {
+          "name": "Start",
+          "description": "Alternative to the reservation id, together with court id."
+        }
       }
     }
   },
   "exceptions": {
-    "no_entry": { "message": "No Ten'Up club is configured (or loaded)." },
-    "slot_unknown": { "message": "No slot on court {court} at {start} in the fetched planning." },
-    "slot_not_free": { "message": "{court} at {start} is not free (state: {state})." },
-    "cancel_target_missing": { "message": "Give a reservation_id, or a court_id with a start." },
-    "reservation_unknown": { "message": "This reservation is not yours or is not in the fetched planning." }
+    "no_entry": {
+      "message": "No Ten'Up club is configured (or loaded)."
+    },
+    "slot_unknown": {
+      "message": "No slot on court {court} at {start} in the fetched planning."
+    },
+    "slot_not_free": {
+      "message": "{court} at {start} is not free (state: {state})."
+    },
+    "cancel_target_missing": {
+      "message": "Give a reservation_id, or a court_id with a start."
+    },
+    "reservation_unknown": {
+      "message": "This reservation is not yours or is not in the fetched planning."
+    }
   }
 }

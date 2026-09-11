@@ -17,6 +17,7 @@ from .api import TenupAuthError, TenupClient, TenupConnectionError
 from .const import (
     MAX_PLAYER_LOOKUPS,
     CONF_DAYS_AHEAD,
+    CONF_FRIENDS,
     CONF_SCAN_INTERVAL,
     DEFAULT_DAYS_AHEAD,
     DEFAULT_SCAN_INTERVAL,
@@ -92,10 +93,24 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         self._store: Store = Store(hass, 1, f"{DOMAIN}_players_{entry.entry_id}")
         self._cache_loaded = False
         self._auth_failures = 0
+        self.friends: list[str] = list(entry.options.get(CONF_FRIENDS) or [])
+        self._options_signature = {k: v for k, v in entry.options.items() if k != CONF_FRIENDS}
 
     @property
     def days_ahead(self) -> int:
         return int(self.entry.options.get(CONF_DAYS_AHEAD, DEFAULT_DAYS_AHEAD))
+
+    def absorb_friends(self, entry: ConfigEntry) -> bool:
+        """Take a new friends list without reloading, if that is the only change.
+
+        Adding a friend from the card must not cost a full refetch of every day.
+        """
+        options = dict(entry.options)
+        friends = list(options.pop(CONF_FRIENDS, []) or [])
+        if options != self._options_signature:
+            return False
+        self.friends = friends
+        return True
 
     async def _async_update_data(self) -> TenupData:
         if not self._cache_loaded:

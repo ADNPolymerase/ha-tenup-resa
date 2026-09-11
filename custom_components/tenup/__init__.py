@@ -55,6 +55,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> boo
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: TenupConfigEntry) -> None:
+    coordinator = getattr(entry, "runtime_data", None)
+    if coordinator is not None and coordinator.absorb_friends(entry):
+        return  # only the friends list changed: nothing to refetch
     await hass.config_entries.async_reload(entry.entry_id)
 
 

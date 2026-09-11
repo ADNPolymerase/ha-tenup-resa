@@ -42,6 +42,7 @@ from .const import (
     CONF_CLUB_NAME,
     CONF_COOKIE,
     CONF_DAYS_AHEAD,
+    CONF_FRIENDS,
     CONF_SCAN_INTERVAL,
     DEFAULT_DAYS_AHEAD,
     DEFAULT_SCAN_INTERVAL,
@@ -222,6 +223,9 @@ class TenupOptionsFlow(OptionsFlow):
                         min=MIN_SCAN_INTERVAL_MINUTES, max=240, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="min"
                     )
                 ),
+                vol.Optional(
+                    CONF_FRIENDS, default=list(options.get(CONF_FRIENDS) or [])
+                ): TextSelector(TextSelectorConfig(multiple=True)),
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)

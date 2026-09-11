@@ -216,3 +216,15 @@ def test_interstitial_is_named_for_the_log():
     assert interstitial_reason(BOT_PAGE) == "a bot challenge"
     assert interstitial_reason("<html><p>oups</p></html>") == "a page carrying no Drupal session marker"
     assert interstitial_reason('<html><body class="html front">x</body></html>') == "an unexpected page"
+
+
+def test_friend_list_is_cleaned_before_being_stored():
+    """Short entries are the trap: Ten'Up labels club lessons with first names."""
+    from custom_components.tenup.websocket import MAX_FRIENDS, clean_friends
+
+    assert clean_friends(["  BLACKWELL  ", "Dyer"]) == ["BLACKWELL", "Dyer"]
+    assert clean_friends(["Van   Dyke"]) == ["Van Dyke"], "inner spaces collapse"
+    assert clean_friends(["Hale", "HALE", "hale"]) == ["Hale"], "case-insensitive de-dup"
+    assert clean_friends(["", "  ", "a", "ab"]) == [], "nothing usable survives"
+    assert clean_friends(["abc"]) == ["abc"], "three characters is the floor"
+    assert len(clean_friends([f"ami{n}" for n in range(MAX_FRIENDS + 20)])) == MAX_FRIENDS

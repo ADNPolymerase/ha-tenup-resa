@@ -15,6 +15,7 @@ CONF_CLUB_CODE = "club_code"
 CONF_CLUB_NAME = "club_name"
 CONF_COOKIE = "cookie"
 CONF_DAYS_AHEAD = "days_ahead"
+CONF_FRIENDS = "friends"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 DEFAULT_DAYS_AHEAD = 7

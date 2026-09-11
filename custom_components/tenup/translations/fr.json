@@ -4,21 +4,29 @@
       "user": {
         "title": "Votre club",
         "description": "Tapez le nom de votre club (ou son code Ten'Up à 8 chiffres).",
-        "data": { "query": "Nom ou code du club" }
+        "data": {
+          "query": "Nom ou code du club"
+        }
       },
       "club": {
         "title": "Choisissez votre club",
-        "data": { "club": "Club" }
+        "data": {
+          "club": "Club"
+        }
       },
       "cookie": {
         "title": "Session Ten'Up",
         "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration : collez votre cookie de session.\n\n1. Connectez-vous sur {site} dans votre navigateur.\n2. Ouvrez les outils de développement (F12), onglet Application (Chrome) ou Stockage (Firefox), puis Cookies > {site_url}.\n3. Copiez la valeur du cookie dont le nom commence par SESS et collez-la ci-dessous (la valeur seule suffit, `SESSxxxx=valeur` marche aussi).\n\nClub : {club} ({club_code})",
-        "data": { "cookie": "Cookie de session" }
+        "data": {
+          "cookie": "Cookie de session"
+        }
       },
       "reauth_confirm": {
         "title": "Session Ten'Up expirée",
         "description": "Reconnectez-vous sur {site} et collez un nouveau cookie SESS pour {club} ({club_code}).",
-        "data": { "cookie": "Cookie de session" }
+        "data": {
+          "cookie": "Cookie de session"
+        }
       }
     },
     "error": {
@@ -38,21 +46,37 @@
       "init": {
         "data": {
           "days_ahead": "Jours à charger",
-          "scan_interval": "Intervalle de rafraîchissement"
+          "scan_interval": "Intervalle de rafraîchissement",
+          "friends": "Amis à mettre en évidence"
+        },
+        "data_description": {
+          "friends": "Noms de famille tels que Ten'Up les affiche. Leurs réservations apparaissent en violet. Trois caractères minimum."
         }
       }
     }
   },
   "entity": {
     "sensor": {
-      "free_slots_today": { "name": "Créneaux libres aujourd'hui" },
-      "free_slots": { "name": "Créneaux libres" },
-      "next_free_slot": { "name": "Prochain créneau libre" },
-      "next_reservation": { "name": "Prochaine réservation" },
-      "my_reservations": { "name": "Mes réservations" }
+      "free_slots_today": {
+        "name": "Créneaux libres aujourd'hui"
+      },
+      "free_slots": {
+        "name": "Créneaux libres"
+      },
+      "next_free_slot": {
+        "name": "Prochain créneau libre"
+      },
+      "next_reservation": {
+        "name": "Prochaine réservation"
+      },
+      "my_reservations": {
+        "name": "Mes réservations"
+      }
     },
     "calendar": {
-      "reservations": { "name": "Réservations" }
+      "reservations": {
+        "name": "Réservations"
+      }
     }
   },
   "services": {
@@ -60,27 +84,58 @@
       "name": "Réserver un court",
       "description": "Réserve un créneau libre pour le titulaire du compte (courts à 1 joueur uniquement pour l'instant).",
       "fields": {
-        "entry_id": { "name": "Club", "description": "Entrée Ten'Up à utiliser (la première si omis)." },
-        "court_id": { "name": "Identifiant du court", "description": "Identifiant Ten'Up du court, visible dans les attributs du planning (ex. 21100)." },
-        "start": { "name": "Début", "description": "Début du créneau, heure locale." }
+        "entry_id": {
+          "name": "Club",
+          "description": "Entrée Ten'Up à utiliser (la première si omis)."
+        },
+        "court_id": {
+          "name": "Identifiant du court",
+          "description": "Identifiant Ten'Up du court, visible dans les attributs du planning (ex. 21100)."
+        },
+        "start": {
+          "name": "Début",
+          "description": "Début du créneau, heure locale."
+        }
       }
     },
     "cancel": {
       "name": "Annuler une réservation",
       "description": "Annule une de vos réservations. Ten'Up ne demande aucune confirmation.",
       "fields": {
-        "entry_id": { "name": "Club", "description": "Entrée Ten'Up à utiliser (la première si omis)." },
-        "reservation_id": { "name": "Identifiant de réservation", "description": "Visible dans le calendrier ou les attributs des capteurs." },
-        "court_id": { "name": "Identifiant du court", "description": "Alternative à l'identifiant de réservation, avec le début." },
-        "start": { "name": "Début", "description": "Alternative à l'identifiant de réservation, avec le court." }
+        "entry_id": {
+          "name": "Club",
+          "description": "Entrée Ten'Up à utiliser (la première si omis)."
+        },
+        "reservation_id": {
+          "name": "Identifiant de réservation",
+          "description": "Visible dans le calendrier ou les attributs des capteurs."
+        },
+        "court_id": {
+          "name": "Identifiant du court",
+          "description": "Alternative à l'identifiant de réservation, avec le début."
+        },
+        "start": {
+          "name": "Début",
+          "description": "Alternative à l'identifiant de réservation, avec le court."
+        }
       }
     }
   },
   "exceptions": {
-    "no_entry": { "message": "Aucun club Ten'Up configuré (ou chargé)." },
-    "slot_unknown": { "message": "Aucun créneau sur le court {court} à {start} dans le planning chargé." },
-    "slot_not_free": { "message": "{court} à {start} n'est pas libre (état : {state})." },
-    "cancel_target_missing": { "message": "Indiquez un reservation_id, ou un court_id avec un début." },
-    "reservation_unknown": { "message": "Cette réservation n'est pas la vôtre ou n'est pas dans le planning chargé." }
+    "no_entry": {
+      "message": "Aucun club Ten'Up configuré (ou chargé)."
+    },
+    "slot_unknown": {
+      "message": "Aucun créneau sur le court {court} à {start} dans le planning chargé."
+    },
+    "slot_not_free": {
+      "message": "{court} à {start} n'est pas libre (état : {state})."
+    },
+    "cancel_target_missing": {
+      "message": "Indiquez un reservation_id, ou un court_id avec un début."
+    },
+    "reservation_unknown": {
+      "message": "Cette réservation n'est pas la vôtre ou n'est pas dans le planning chargé."
+    }
   }
 }
