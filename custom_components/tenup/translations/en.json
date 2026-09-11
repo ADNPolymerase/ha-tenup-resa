@@ -16,21 +16,21 @@
       },
       "cookie": {
         "title": "Ten'Up session",
-        "description": "Ten'Up does not allow logging in with a password from an integration, so it needs your session.\n\nClub: {club} ({club_code}).\n\n**1. [Open Ten'Up]({site_url})** in a new tab and log in with your FFT credentials. Leave the page open.\n\n**2.** Still on the Ten'Up tab, click your **Ten'Up session** bookmarklet: it copies the session to your clipboard. Do not have it yet? [Create it in ten seconds](https://github.com/ADNPolymerase/ha-tenup-resa/blob/main/README.md#configuration).\n\n**3.** Come back here and paste the session in the field below.",
+        "description": "Ten'Up does not allow logging in with a password from an integration, so it needs your session.\n\nClub: {club} ({club_code}).\n\n**1. [Open Ten'Up]({site_url})** in a new tab and log in with your FFT credentials. Leave the page open.\n\n**2.** Still on the Ten'Up tab, click your **Ten'Up session** bookmarklet: it copies the session to your clipboard. Do not have it yet? **[Install it in ten seconds](/api/tenup/bookmarklet)**.\n\n**3.** Come back here and paste the session in the field below.",
         "data": {
           "cookie": "Session cookie"
         }
       },
       "reauth_confirm": {
         "title": "Ten'Up session expired",
-        "description": "The Ten'Up session for {club} ({club_code}) is no longer accepted.\n\n**1. [Open Ten'Up]({site_url})** in a new tab and log in with your FFT credentials. Leave the page open.\n\n**2.** Still on the Ten'Up tab, click your **Ten'Up session** bookmarklet: it copies the session to your clipboard. Do not have it yet? [Create it in ten seconds](https://github.com/ADNPolymerase/ha-tenup-resa/blob/main/README.md#configuration).\n\n**3.** Come back here and paste the session in the field below.",
+        "description": "The Ten'Up session for {club} ({club_code}) is no longer accepted.\n\n**1. [Open Ten'Up]({site_url})** in a new tab and log in with your FFT credentials. Leave the page open.\n\n**2.** Still on the Ten'Up tab, click your **Ten'Up session** bookmarklet: it copies the session to your clipboard. Do not have it yet? **[Install it in ten seconds](/api/tenup/bookmarklet)**.\n\n**3.** Come back here and paste the session in the field below.",
         "data": {
           "cookie": "Session cookie"
         }
       },
       "reconfigure": {
         "title": "Ten'Up session",
-        "description": "Hand over a new session for {club} ({club_code}).\n\n**1. [Open Ten'Up]({site_url})** in a new tab and log in with your FFT credentials. Leave the page open.\n\n**2.** Still on the Ten'Up tab, click your **Ten'Up session** bookmarklet: it copies the session to your clipboard. Do not have it yet? [Create it in ten seconds](https://github.com/ADNPolymerase/ha-tenup-resa/blob/main/README.md#configuration).\n\n**3.** Come back here and paste the session in the field below.",
+        "description": "Hand over a new session for {club} ({club_code}).\n\n**1. [Open Ten'Up]({site_url})** in a new tab and log in with your FFT credentials. Leave the page open.\n\n**2.** Still on the Ten'Up tab, click your **Ten'Up session** bookmarklet: it copies the session to your clipboard. Do not have it yet? **[Install it in ten seconds](/api/tenup/bookmarklet)**.\n\n**3.** Come back here and paste the session in the field below.",
         "data": {
           "cookie": "Session cookie"
         }

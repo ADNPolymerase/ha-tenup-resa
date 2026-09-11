@@ -30,7 +30,7 @@ L'intégration lit le tableau de réservation des adhérents (« Réserver dans 
 
 1. **Votre club** : tapez son nom et choisissez-le dans la liste (ou collez son code Ten'Up à 8 chiffres, visible dans l'URL du tableau de réservation).
 2. **Votre session** : Ten'Up n'autorise pas la connexion par mot de passe depuis un outil tiers (la page de connexion est protégée contre les connexions automatisées). L'intégration utilise donc la session de votre navigateur :
-   **Le plus simple, sans outils de développement.** Créez un marque-page dont l'adresse est la ligne ci-dessous, connectez-vous sur tenup.fft.fr, puis cliquez dessus : il met la session dans votre presse-papier, vous n'avez plus qu'à la coller dans Home Assistant. Si le navigateur refuse le presse-papier, il affiche la valeur à copier.
+   **Le plus simple, sans outils de développement.** Le formulaire de Home Assistant propose un lien **Installez-le en dix secondes**, qui ouvre une page servie par Home Assistant d'où le marque-page se glisse directement dans la barre de favoris. Son adresse est la ligne ci-dessous. Connectez-vous ensuite sur tenup.fft.fr et cliquez dessus : il met la session dans votre presse-papier, vous n'avez plus qu'à la coller dans Home Assistant. Si le navigateur refuse le presse-papier, il affiche la valeur à copier.
 
    ```javascript
    javascript:(function(){var m=document.cookie.match(/(?:^|;\s*)SHARED_SESSION_DRUPAL=([^;]+)/);if(!m){alert("Connectez-vous d'abord sur tenup.fft.fr, puis recliquez.");return}var v="SHARED_SESSION_DRUPAL="+m[1];function f(){prompt("Collez ceci dans Home Assistant:",v)}try{navigator.clipboard.writeText(v).then(function(){alert("Session copiee. Collez-la dans Home Assistant (Ctrl+V ou Cmd+V).")},f)}catch(e){f()}})()
