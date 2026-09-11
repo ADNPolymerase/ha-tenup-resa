@@ -15,6 +15,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -37,6 +38,7 @@ from .api import (
     new_session,
     parse_cookie_header,
 )
+from .http import BOOKMARKLET, BOOKMARKLET_URL, EN, FR
 from .const import (
     CONF_CLUB_CODE,
     CONF_CLUB_NAME,
@@ -140,11 +142,21 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     def _placeholders(self) -> dict[str, str]:
+        language = (self.hass.config.language or "en").lower()
+        texts = FR if language.startswith("fr") else EN
+        try:
+            base = get_url(self.hass)
+        except NoURLAvailableError:
+            base = ""
         return {
             "club": self._club_name or "",
             "club_code": self._club_code or "",
             "site": "tenup.fft.fr",
             "site_url": "https://tenup.fft.fr",
+            # Shown in the dialog itself: the user has the line under their eyes,
+            # with no page to open and nothing to go and look for.
+            "bookmarklet": BOOKMARKLET % texts,
+            "bookmarklet_url": f"{base}{BOOKMARKLET_URL}",
         }
 
     async def _async_validate_cookie(self, cookie: str, club_code: str) -> tuple[str | None, str]:

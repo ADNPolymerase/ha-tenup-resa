@@ -8,6 +8,9 @@
   about two months instead of the twenty three days of the Drupal session. Home
   Assistant opens a session from it whenever it needs one. A setup pasted before this
   keeps working on its `SESS` cookie.
+- Setup: the bookmarklet line is shown in the dialog itself, so it can be copied
+  without leaving it, and the link to the install page is absolute (a relative one
+  is not turned into a link by the frontend).
 - Setup: Home Assistant serves the bookmarklet install page itself, at
   `/api/tenup/bookmarklet`, so the link can be dragged straight to the bookmarks bar.
   It is static documentation and holds no user data.

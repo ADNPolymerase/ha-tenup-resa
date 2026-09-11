@@ -16,21 +16,21 @@
       },
       "cookie": {
         "title": "Session Ten'Up",
-        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration, il faut lui passer votre session.\n\nClub : {club} ({club_code}).\n\n**1. [Ouvrir Ten'Up]({site_url})** dans un nouvel onglet et connectez-vous avec vos identifiants FFT. Laissez la page ouverte.\n\n**2.** Toujours sur l'onglet Ten'Up, cliquez votre marque-page **Session Ten'Up** : il copie la session dans le presse-papier. Vous ne l'avez pas encore ? **[Installez-le en dix secondes](/api/tenup/bookmarklet)**.\n\n**3.** Revenez ici et collez la session dans le champ ci-dessous.",
+        "description": "Ten'Up n'autorise pas la connexion par mot de passe depuis une intégration, il faut lui passer votre session.\n\nClub : {club} ({club_code}).\n\n**1. [Ouvrir Ten'Up]({site_url})** dans un nouvel onglet et connectez-vous avec vos identifiants FFT. Laissez la page ouverte.\n\n**2.** Toujours sur l'onglet Ten'Up, cliquez votre marque-page **Session Ten'Up** : il copie la session dans le presse-papier.\n\nVous ne l'avez pas encore ? Créez un favori dont l'adresse est cette ligne, en gardant bien le `javascript:` du début (certains navigateurs l'effacent au collage) :\n\n```\n{bookmarklet}\n```\n\nPlus simple encore, [cette page]({bookmarklet_url}) vous laisse le glisser directement dans votre barre de favoris.\n\n**3.** Revenez ici et collez la session dans le champ ci-dessous.",
         "data": {
           "cookie": "Cookie de session"
         }
       },
       "reauth_confirm": {
         "title": "Session Ten'Up expirée",
-        "description": "La session Ten'Up de {club} ({club_code}) n'est plus acceptée.\n\n**1. [Ouvrir Ten'Up]({site_url})** dans un nouvel onglet et connectez-vous avec vos identifiants FFT. Laissez la page ouverte.\n\n**2.** Toujours sur l'onglet Ten'Up, cliquez votre marque-page **Session Ten'Up** : il copie la session dans le presse-papier. Vous ne l'avez pas encore ? **[Installez-le en dix secondes](/api/tenup/bookmarklet)**.\n\n**3.** Revenez ici et collez la session dans le champ ci-dessous.",
+        "description": "La session Ten'Up de {club} ({club_code}) n'est plus acceptée.\n\n**1. [Ouvrir Ten'Up]({site_url})** dans un nouvel onglet et connectez-vous avec vos identifiants FFT. Laissez la page ouverte.\n\n**2.** Toujours sur l'onglet Ten'Up, cliquez votre marque-page **Session Ten'Up** : il copie la session dans le presse-papier.\n\nVous ne l'avez pas encore ? Créez un favori dont l'adresse est cette ligne, en gardant bien le `javascript:` du début (certains navigateurs l'effacent au collage) :\n\n```\n{bookmarklet}\n```\n\nPlus simple encore, [cette page]({bookmarklet_url}) vous laisse le glisser directement dans votre barre de favoris.\n\n**3.** Revenez ici et collez la session dans le champ ci-dessous.",
         "data": {
           "cookie": "Cookie de session"
         }
       },
       "reconfigure": {
         "title": "Session Ten'Up",
-        "description": "Donnez une nouvelle session pour {club} ({club_code}).\n\n**1. [Ouvrir Ten'Up]({site_url})** dans un nouvel onglet et connectez-vous avec vos identifiants FFT. Laissez la page ouverte.\n\n**2.** Toujours sur l'onglet Ten'Up, cliquez votre marque-page **Session Ten'Up** : il copie la session dans le presse-papier. Vous ne l'avez pas encore ? **[Installez-le en dix secondes](/api/tenup/bookmarklet)**.\n\n**3.** Revenez ici et collez la session dans le champ ci-dessous.",
+        "description": "Donnez une nouvelle session pour {club} ({club_code}).\n\n**1. [Ouvrir Ten'Up]({site_url})** dans un nouvel onglet et connectez-vous avec vos identifiants FFT. Laissez la page ouverte.\n\n**2.** Toujours sur l'onglet Ten'Up, cliquez votre marque-page **Session Ten'Up** : il copie la session dans le presse-papier.\n\nVous ne l'avez pas encore ? Créez un favori dont l'adresse est cette ligne, en gardant bien le `javascript:` du début (certains navigateurs l'effacent au collage) :\n\n```\n{bookmarklet}\n```\n\nPlus simple encore, [cette page]({bookmarklet_url}) vous laisse le glisser directement dans votre barre de favoris.\n\n**3.** Revenez ici et collez la session dans le champ ci-dessous.",
         "data": {
           "cookie": "Cookie de session"
         }
