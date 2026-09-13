@@ -120,20 +120,31 @@ def test_parse_partner_choice_refuses_a_label_without_an_identifier():
     assert parse_partner_choice("John DOE (abc)") is None
 
 
-def test_partner_post_variants_keep_the_base_and_add_one_shape_each():
-    from custom_components.tenup.api import partner_post_variants
+def test_formule_ajax_payload_carries_userid_and_currentformule():
+    from custom_components.tenup.api import formule_ajax_payload
 
-    base = {"codeClub": "87654321", "idCourt": "21099"}
-    variants = partner_post_variants(base, "John DOE (111111111)")
-    assert len(variants) == 5
-    for payload in variants:
-        assert payload["codeClub"] == "87654321" and payload["idCourt"] == "21099"
-    assert variants[0]["joueur2_nom"] == "John DOE (111111111)"
-    assert variants[1]["idPartenaire"] == "111111111"
-    assert base == {"codeClub": "87654321", "idCourt": "21099"}  # jamais mute
+    params = {"codeClub": "87654321", "ticketAutorises": True, "url": "formule/ajax"}
+    body = formule_ajax_payload(params, "111111111", "18332817")
+    assert body["userId"] == "111111111"
+    assert body["currentFormule"] == "18332817"
+    assert body["codeClub"] == "87654321"
+    # url sert d adresse, il ne doit pas rester dans le corps
+    assert "url" not in body
 
 
-def test_partner_post_variants_is_empty_without_an_identifier():
-    from custom_components.tenup.api import partner_post_variants
+def test_formule_ajax_payload_renders_booleans_the_way_qs_stringify_does():
+    from custom_components.tenup.api import formule_ajax_payload
 
-    assert partner_post_variants({"a": "b"}, "J. DOE") == []
+    body = formule_ajax_payload({"a": True, "b": False, "c": 12, "d": None}, "1")
+    assert body["a"] == "true" and body["b"] == "false"
+    assert body["c"] == "12"
+    assert "d" not in body  # une valeur nulle n est pas envoyee
+
+
+def test_formule_ajax_payload_defaults_currentformule_to_empty_and_keeps_base_intact():
+    from custom_components.tenup.api import formule_ajax_payload
+
+    params = {"codeClub": "87654321"}
+    assert formule_ajax_payload(params, "1")["currentFormule"] == ""
+    assert formule_ajax_payload(params, "1", None)["currentFormule"] == ""
+    assert params == {"codeClub": "87654321"}

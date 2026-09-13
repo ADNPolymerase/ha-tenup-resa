@@ -232,24 +232,29 @@ def parse_partner_choice(label: str) -> tuple[str, str] | None:
     return match.group("name").strip(), match.group("ident")
 
 
-def partner_post_variants(base: dict[str, str], label: str) -> list[dict[str, str]]:
-    """formule/ajax needs the partner, and Ten'Up never says under which key."""
-    parsed = parse_partner_choice(label)
-    if parsed is None:
-        return []
-    _name, ident = parsed
-    out: list[dict[str, str]] = []
-    for extra in (
-        {"joueur2_nom": label},
-        {"idPartenaire": ident},
-        {"idJoueur": ident},
-        {"idAdherent": ident},
-        {"joueur2_nom": label, "idPartenaire": ident},
-    ):
-        payload = dict(base)
-        payload.update(extra)
-        out.append(payload)
-    return out
+def formule_ajax_payload(
+    ajax_params: dict[str, Any], user_id: str, current_formule: str = ""
+) -> dict[str, str]:
+    """The body fetchUserFormule sends, verbatim.
+
+    postParams = {userId, currentFormule} merged with params_formule_joueur_ajax,
+    then url is removed and used as the address. qs.stringify renders booleans
+    as true/false, so match that rather than Python's True/False.
+    """
+    payload: dict[str, str] = {
+        "userId": str(user_id),
+        "currentFormule": str(current_formule or ""),
+    }
+    for key, value in ajax_params.items():
+        if key == "url" or value is None:
+            continue
+        if value is True:
+            payload[key] = "true"
+        elif value is False:
+            payload[key] = "false"
+        else:
+            payload[key] = str(value)
+    return payload
 
 
 def script_urls(html: str, limit: int = _MAX_JS_ASSETS) -> list[str]:
@@ -571,29 +576,36 @@ class TenupClient:
                      "final_path": pfinal.path, "body": _sample(ptext)}
                 )
         if partner:
-            report["partner_parsed"] = parse_partner_choice(partner)
-            report["partner_attempts"] = []
-            for payload in partner_post_variants(post_data, partner):
-                added = sorted(set(payload) - set(post_data))
-                try:
-                    text, _, status = await self._request(
-                        "POST",
-                        f"{BASE_URL}/club/reservations/formule/ajax",
-                        headers={
-                            **_JSON_HEADERS,
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "Origin": BASE_URL,
-                            "Referer": urljoin(BASE_URL, book_path),
-                            "X-Requested-With": "XMLHttpRequest",
-                        },
-                        data=payload,
+            parsed = parse_partner_choice(partner)
+            report["partner_parsed"] = parsed
+            report["fetch_user_formule"] = []
+            if parsed is not None:
+                _name, user_id = parsed
+                # currentFormule is joueur1's own formula; try none, then each.
+                for current in [""] + sorted(cotisation):
+                    payload = formule_ajax_payload(params, user_id, current)
+                    try:
+                        text, _, status = await self._request(
+                            "POST",
+                            f"{BASE_URL}/club/reservations/formule/ajax",
+                            headers={
+                                **_JSON_HEADERS,
+                                "Content-Type": "application/x-www-form-urlencoded",
+                                "Origin": BASE_URL,
+                                "Referer": urljoin(BASE_URL, book_path),
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            data=payload,
+                        )
+                    except TenupError as err:
+                        report["fetch_user_formule"].append(
+                            {"currentFormule": current, "error": str(err)}
+                        )
+                        continue
+                    report["fetch_user_formule"].append(
+                        {"currentFormule": current, "status": status,
+                         "body": " ".join(text.split())[:700]}
                     )
-                except TenupError as err:
-                    report["partner_attempts"].append({"keys": added, "error": str(err)})
-                    continue
-                report["partner_attempts"].append(
-                    {"keys": added, "status": status, "body": _sample(text)}
-                )
 
         report["js"] = []
         report["js_scanned"] = []
