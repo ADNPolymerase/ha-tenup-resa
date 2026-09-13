@@ -1,4 +1,4 @@
-<img src="custom_components/tenup/brand/logo.png" alt="Ten'Up" width="420">
+<img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/custom_components/tenup/brand/logo.png" alt="Ten'Up" width="420">
 
 # Ten'Up for Home Assistant
 
@@ -52,7 +52,7 @@ A repository you just added is listed as New and can be hidden by the status fil
 
    **Without the bookmarklet**, the value is in the developer tools (F12) > Application tab > Cookies > `https://tenup.fft.fr`:
 
-   <img src="docs/cookie-devtools.png" alt="The SHARED_SESSION_DRUPAL row in the cookies" width="760">
+   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png" alt="The SHARED_SESSION_DRUPAL row in the cookies" width="760">
 
    Or: Network tab > right-click a row > Copy > **Copy as cURL**, and paste the whole thing. The integration keeps only the useful cookie: URLs, headers and other cookies are ignored and never stored.
 

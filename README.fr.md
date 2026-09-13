@@ -1,4 +1,4 @@
-<img src="custom_components/tenup/brand/logo.png" alt="Ten'Up" width="420">
+<img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/custom_components/tenup/brand/logo.png" alt="Ten'Up" width="420">
 
 # Ten'Up pour Home Assistant
 
@@ -52,7 +52,7 @@ Un dépôt tout juste ajouté apparaît comme « Nouveau » et peut être masqu�
 
    **Sans marque-page**, la valeur se lit dans les outils de développement (F12) > onglet Appli > Cookies > `https://tenup.fft.fr` :
 
-   <img src="docs/cookie-devtools.fr.png" alt="La ligne SHARED_SESSION_DRUPAL dans les cookies" width="760">
+   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.fr.png" alt="La ligne SHARED_SESSION_DRUPAL dans les cookies" width="760">
 
    Au choix aussi : onglet Réseau > clic droit sur une ligne > Copier > **Copier en tant que cURL**, et collez le tout. L'intégration ne retient que le cookie utile : adresses, en-têtes et autres cookies sont ignorés et ne sont jamais enregistrés.
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2
+
+Documentation only.
+
+- README images use absolute addresses, so the logo and the cookie screenshot also show
+  inside HACS, which does not rewrite relative paths in HTML image tags.
+- Installation goes through the HACS 2 menus, says to search for `tenup`, and explains
+  that a repository just added is listed as New and can be hidden by the status filter.
+
 ## 0.4.1
 
 - Manifest keys put back in the order hassfest wants (`domain`, `name`, then
