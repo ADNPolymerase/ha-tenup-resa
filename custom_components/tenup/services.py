@@ -30,6 +30,7 @@ BOOK_SCHEMA = vol.Schema(
         vol.Optional(ATTR_ENTRY_ID): cv.string,
         vol.Required(ATTR_COURT_ID): cv.string,
         vol.Required(ATTR_START): cv.datetime,
+        vol.Optional(ATTR_PARTNER): cv.string,
     }
 )
 PROBE_SCHEMA = vol.Schema(
@@ -92,8 +93,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="slot_not_free",
                 translation_placeholders={"court": slot.court_name, "start": start.isoformat(), "state": slot.state},
             )
+        partner = call.data.get(ATTR_PARTNER)
         try:
-            message = await coordinator.async_book(slot)
+            message = await coordinator.async_book(slot, partner)
         except TenupBookingError as err:
             raise HomeAssistantError(f"Ten'Up: {err}") from err
         except TenupAuthError as err:

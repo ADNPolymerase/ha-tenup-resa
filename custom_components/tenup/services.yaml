@@ -1,5 +1,10 @@
 book:
   fields:
+    partner:
+      required: false
+      example: "John DOE"
+      selector:
+        text:
     entry_id:
       required: false
       selector:

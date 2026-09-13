@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -368,14 +369,137 @@ class BookingForm:
     partner_fields: list[str]
     submit_name: str = "reservation_detail_submit"
     submit_value: str = "Suivant"
+    # A 2-player slot: the autocomplete key ("Prenom NOM (idAdherent)") and the
+    # formula formule/ajax returned for that partner.
+    partner_choice: str | None = None
+    partner_formula: str | None = None
 
     def as_post_data(self) -> dict[str, str]:
-        return {
+        data = {
             "joueur1_nom": self.player_name,
             "joueur1_formule": self.formula_id,
             "submit_data": self.submit_data,
             self.submit_name: self.submit_value,
         }
+        if self.partner_choice:
+            data["joueur2_nom"] = self.partner_choice
+        if self.partner_formula:
+            data["joueur2_formule"] = self.partner_formula
+        return data
+
+
+def parse_partner_results(text: str) -> list[tuple[str, str]]:
+    """Read the partner autocomplete: [(choice, display), ...].
+
+    Ten'Up answers {key: display} where the KEY is what the field submits and
+    carries the Ten'Up member id, so it is the half that tells two homonyms apart.
+    """
+    try:
+        data = json.loads(text)
+    except ValueError as err:
+        raise TenupParseError("partner autocomplete did not answer JSON") from err
+    if not isinstance(data, dict):
+        raise TenupParseError("partner autocomplete did not answer an object")
+    return [(str(k), str(v)) for k, v in data.items()]
+
+
+def parse_formules_response(text: str) -> list[dict[str, Any]]:
+    """Read the formula list from formule/ajax.
+
+    On success the endpoint answers a JSON *string* that itself contains JSON,
+    so it has to be decoded twice; an error answers a plain object instead.
+    """
+    try:
+        data = json.loads(text)
+    except ValueError as err:
+        raise TenupParseError("formule/ajax did not answer JSON") from err
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except ValueError as err:
+            raise TenupParseError("formule/ajax answered a string that is not JSON") from err
+    if not isinstance(data, dict):
+        raise TenupParseError("formule/ajax did not answer an object")
+    if data.get("erreur"):
+        raise TenupParseError(str(data["erreur"]))
+    return [f for f in (data.get("formules") or []) if isinstance(f, dict)]
+
+
+_PARTNER_CHOICE_RE = re.compile(r"^(?P<name>.+?)\s*\((?P<ident>\d+)\)\s*$")
+
+
+def _fold(text: str) -> str:
+    """Case and accent insensitive form, so DOE matches Doe."""
+    stripped = "".join(
+        c for c in unicodedata.normalize("NFD", text) if not unicodedata.combining(c)
+    )
+    return stripped.casefold()
+
+
+def resolve_partner(
+    results: list[tuple[str, str]], wanted: str
+) -> list[tuple[str, str]]:
+    """Narrow autocomplete results to those matching a stored friend.
+
+    A stored entry may already be an exact choice carrying the Ten'Up member id
+    ("John DOE (111111111)"), or just a name someone typed by hand
+    ("DOE"). Return every candidate: the caller books when exactly one is
+    left and asks the user when several are, so a father and his son are never
+    confused silently.
+    """
+    target = _fold(wanted.strip())
+    if not target:
+        return []
+    exact = [r for r in results if _fold(r[0]) == target]
+    if exact:
+        return exact
+    words = [w for w in re.split(r"[^0-9a-z]+", target) if w]
+    if not words:
+        return []
+    out = []
+    for choice, display in results:
+        haystack = re.split(r"[^0-9a-z]+", _fold(display))
+        if all(w in haystack for w in words):
+            out.append((choice, display))
+    return out
+
+
+def partner_search_term(stored: str) -> str:
+    """What to type into the autocomplete for a stored friend.
+
+    A stored entry may be a full choice ("John DOE (111111111)") or a bare
+    name. Ten'Up wants at least 3 characters and matches on the name, so send
+    the longest word rather than the whole string.
+    """
+    name = stored.strip()
+    parsed = _PARTNER_CHOICE_RE.match(name)
+    if parsed is not None:
+        name = parsed.group("name").strip()
+    words = [w for w in re.split(r"\s+", name) if len(w) >= 3]
+    return max(words, key=len) if words else name
+
+
+def free_formulas(formulas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop anything that would charge money.
+
+    Ten'Up already hides the paid option for a club member, but the guard is in
+    code and not merely in the UI: a partner formula must never cost the user
+    anything without them asking for it.
+    """
+    out = []
+    for formula in formulas:
+        if not isinstance(formula, dict) or formula.get("disabled"):
+            continue
+        try:
+            price = float(formula.get("prix") or 0)
+        except (TypeError, ValueError):
+            continue
+        if price > 0:
+            continue
+        if "UNITAIRE" in str(formula.get("value", "")).upper():
+            continue
+        out.append(formula)
+    return out
 
 
 def parse_booking_form(html: str) -> BookingForm:

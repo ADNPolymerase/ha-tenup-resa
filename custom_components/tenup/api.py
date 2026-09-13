@@ -21,11 +21,14 @@ from .parser import (
     Slot,
     TenupParseError,
     extract_drupal_settings,
+    free_formulas,
     interstitial_reason,
     is_logged_in,
     looks_signed_out,
     parse_booking_form,
+    parse_formules_response,
     parse_messages,
+    parse_partner_results,
     parse_planning,
 )
 
@@ -221,7 +224,7 @@ _PARTNER_CHOICE_RE = re.compile(r"^(?P<name>.+?)\s*\((?P<ident>\d+)\)\s*$")
 
 
 def parse_partner_choice(label: str) -> tuple[str, str] | None:
-    """Split an autocomplete key: 'John DOE (111111111)' -> name + licence id.
+    """Split an autocomplete key: 'John DOE (111111111)' -> name + Ten'Up member id.
 
     The autocomplete answers {key: display}, and the key is what the field
     submits, so it carries the identifier that tells two homonyms apart.
@@ -625,14 +628,65 @@ class TenupClient:
                 report["js"].append({"url": url, "status": status, "hits": hits})
         return report
 
-    async def async_book(self, slot: Slot) -> str:
-        """Book a free slot for the account owner alone. Returns the confirmation text."""
+    async def async_search_partner(self, query: str) -> list[tuple[str, str]]:
+        """Search a club member to play with, the way the site's own field does."""
+        term = query.strip()
+        if len(term) < 3:
+            raise TenupBookingError("Indiquez au moins 3 caracteres pour chercher un partenaire")
+        text, _final, status = await self._request(
+            "GET",
+            f"{BASE_URL}{JOUEUR_AUTOCOMPLETE_PATH}/{quote(term, safe='')}",
+            headers=_JSON_HEADERS,
+        )
+        if status >= 500:
+            raise TenupConnectionError(f"Ten'Up answered {status} on the partner search")
+        return parse_partner_results(text)
+
+    async def async_partner_formulas(
+        self, book_path: str, user_id: str
+    ) -> list[dict[str, Any]]:
+        """Formulas Ten'Up opens to that partner, paid ones removed."""
+        body, _ = await self._get_html(book_path)
+        settings = extract_drupal_settings(body)
+        params = (settings.get("reservation_detail") or {}).get(
+            "params_formule_joueur_ajax"
+        ) or {}
+        text, _final, status = await self._request(
+            "POST",
+            f"{BASE_URL}/club/reservations/formule/ajax",
+            headers={
+                **_JSON_HEADERS,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": BASE_URL,
+                "Referer": urljoin(BASE_URL, book_path),
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            data=formule_ajax_payload(params, user_id),
+        )
+        if status >= 500:
+            raise TenupConnectionError(f"Ten'Up answered {status} on formule/ajax")
+        return free_formulas(parse_formules_response(text))
+
+    async def async_book(
+        self,
+        slot: Slot,
+        partner_choice: str | None = None,
+        partner_formula: str | None = None,
+    ) -> str:
+        """Book a free slot. Returns the confirmation text.
+
+        A slot that demands two players needs partner_choice, the autocomplete
+        key that carries the Ten'Up member id.
+        """
         form = await self.async_get_booking_form(slot)
-        if form.required_players > 1:
+        if form.required_players > 1 and not partner_choice:
             raise TenupBookingError(
                 f"Ce créneau demande {form.required_players} joueurs; "
-                "l'ajout d'un partenaire n'est pas encore pris en charge"
+                "indiquez un partenaire"
             )
+        if partner_choice:
+            form.partner_choice = partner_choice
+            form.partner_formula = partner_formula
         body, final_url, status = await self._request(
             "POST",
             f"{BASE_URL}/club/reservations/detail/submit",

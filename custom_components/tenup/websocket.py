@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 
+from .api import TenupError
 from .const import CONF_FRIENDS, DOMAIN
 
 
@@ -15,6 +16,7 @@ from .const import CONF_FRIENDS, DOMAIN
 def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_planning)
     websocket_api.async_register_command(hass, ws_set_friends)
+    websocket_api.async_register_command(hass, ws_search_partner)
 
 
 @websocket_api.websocket_command(
@@ -54,6 +56,41 @@ def ws_get_planning(
                 for day, planning in sorted(data.plannings.items())
             ],
         },
+    )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "tenup/partner/search",
+        vol.Optional("entry_id"): str,
+        vol.Required("query"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_search_partner(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Search a club member to play with.
+
+    The card shows the names and keeps the matching key out of sight, so nobody
+    ever has to find a member id by hand: this is the same search the site's own
+    partner field performs.
+    """
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if msg.get("entry_id"):
+        entries = [e for e in entries if e.entry_id == msg["entry_id"]]
+    entries = [e for e in entries if getattr(e, "runtime_data", None) is not None]
+    if not entries:
+        connection.send_error(msg["id"], "not_found", "No loaded Ten'Up entry")
+        return
+    try:
+        results = await entries[0].runtime_data.client.async_search_partner(msg["query"])
+    except TenupError as err:
+        connection.send_error(msg["id"], "search_failed", str(err))
+        return
+    connection.send_result(
+        msg["id"],
+        {"results": [{"choice": choice, "name": name} for choice, name in results]},
     )
 
 

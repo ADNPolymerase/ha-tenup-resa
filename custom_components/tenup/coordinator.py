@@ -13,7 +13,13 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import TenupAuthError, TenupClient, TenupConnectionError
+from .api import (
+    TenupAuthError,
+    TenupBookingError,
+    TenupClient,
+    TenupConnectionError,
+    parse_partner_choice,
+)
 from .const import (
     MAX_PLAYER_LOOKUPS,
     CONF_COOKIE,
@@ -26,7 +32,12 @@ from .const import (
     SLOT_FREE,
     SLOT_MINE,
 )
-from .parser import Planning, Slot
+from .parser import (
+    Planning,
+    Slot,
+    partner_search_term,
+    resolve_partner,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -189,11 +200,47 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         for slot in free:
             slot.required_players = self._players_cache.get(slot.creneau_id)
 
-    async def async_book(self, slot: Slot) -> str:
-        result = await self.client.async_book(slot)
+    async def async_book(self, slot: Slot, partner: str | None = None) -> str:
+        choice: str | None = None
+        formula: str | None = None
+        if partner:
+            choice, formula = await self._resolve_partner(slot, partner)
+        result = await self.client.async_book(slot, choice, formula)
         self._apply_locally(slot.mark_mine)
         await self.async_request_refresh()
         return result
+
+    async def _resolve_partner(self, slot: Slot, partner: str) -> tuple[str, str | None]:
+        """Turn a stored friend into the exact choice Ten'Up expects.
+
+        The user stores a name; Ten'Up wants the autocomplete key, which carries
+        the member id. Two homonyms are never resolved silently: a father and
+        his son share a surname, so an ambiguous name asks rather than guesses.
+        """
+        results = await self.client.async_search_partner(partner_search_term(partner))
+        candidates = resolve_partner(results, partner)
+        if not candidates:
+            raise TenupBookingError(
+                f"Aucun adhérent du club ne correspond à « {partner} »"
+            )
+        if len(candidates) > 1:
+            names = ", ".join(display for _choice, display in candidates)
+            raise TenupBookingError(
+                f"Plusieurs adhérents correspondent à « {partner} » : {names}. "
+                "Précisez le prénom."
+            )
+        choice, display = candidates[0]
+        parsed = parse_partner_choice(choice)
+        if parsed is None:
+            raise TenupBookingError(f"Ten'Up n'a pas donné d'identifiant pour {display}")
+        formulas = await self.client.async_partner_formulas(
+            slot.book_path or "", parsed[1]
+        )
+        if not formulas:
+            raise TenupBookingError(
+                f"Ten'Up ne propose aucune formule gratuite pour {display}"
+            )
+        return choice, str(formulas[0].get("value") or "")
 
     async def async_cancel(self, slot: Slot) -> None:
         await self.client.async_cancel(slot)
