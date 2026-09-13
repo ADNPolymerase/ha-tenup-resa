@@ -23,6 +23,7 @@ from .const import (
 
 ATTR_ENTRY_ID = "entry_id"
 ATTR_QUERY = "query"
+ATTR_PARTNER = "partner"
 
 BOOK_SCHEMA = vol.Schema(
     {
@@ -37,6 +38,7 @@ PROBE_SCHEMA = vol.Schema(
         vol.Required(ATTR_COURT_ID): cv.string,
         vol.Required(ATTR_START): cv.datetime,
         vol.Required(ATTR_QUERY): cv.string,
+        vol.Optional(ATTR_PARTNER): cv.string,
     }
 )
 CANCEL_SCHEMA = vol.Schema(
@@ -139,7 +141,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
             )
         try:
             return await coordinator.client.async_probe_partner(
-                slot.book_path, call.data[ATTR_QUERY]
+                slot.book_path, call.data[ATTR_QUERY], call.data.get(ATTR_PARTNER)
             )
         except TenupAuthError as err:
             coordinator.entry.async_start_reauth(hass)

@@ -163,11 +163,14 @@ _PROBE_SAMPLE = 400
 _JS_RADIUS = 320
 _JS_NEEDLES = (
     "autocomplete/partenaire",
+    "params_formule_joueur_ajax",
     "formule/ajax",
-    "joueur2_formule",
+    "formuleAjax",
+    "joueur2_nom",
+    "idPartenaire",
     "detail/submit",
 )
-_MAX_JS_ASSETS = 14
+_MAX_JS_ASSETS = 25
 _SCRIPT_SRC_RE = re.compile(r'<script[^>]+src="([^"]+)"', re.I)
 
 
@@ -215,6 +218,41 @@ def formule_ajax_candidates(book_path: str, url_fragment: str) -> list[str]:
         candidate = urljoin(base, frag)
         if candidate not in out:
             out.append(candidate)
+    return out
+
+
+_PARTNER_CHOICE_RE = re.compile(r"^(?P<name>.+?)\s*\((?P<ident>\d+)\)\s*$")
+
+
+def parse_partner_choice(label: str) -> tuple[str, str] | None:
+    """Split an autocomplete key: 'John DOE (111111111)' -> name + licence id.
+
+    The autocomplete answers {key: display}, and the key is what the field
+    submits, so it carries the identifier that tells two homonyms apart.
+    """
+    match = _PARTNER_CHOICE_RE.match(label.strip())
+    if match is None:
+        return None
+    return match.group("name").strip(), match.group("ident")
+
+
+def partner_post_variants(base: dict[str, str], label: str) -> list[dict[str, str]]:
+    """formule/ajax needs the partner, and Ten'Up never says under which key."""
+    parsed = parse_partner_choice(label)
+    if parsed is None:
+        return []
+    _name, ident = parsed
+    out: list[dict[str, str]] = []
+    for extra in (
+        {"joueur2_nom": label},
+        {"idPartenaire": ident},
+        {"idJoueur": ident},
+        {"idAdherent": ident},
+        {"joueur2_nom": label, "idPartenaire": ident},
+    ):
+        payload = dict(base)
+        payload.update(extra)
+        out.append(payload)
     return out
 
 
@@ -443,7 +481,9 @@ class TenupClient:
         except (TenupParseError, TenupError):
             return None
 
-    async def async_probe_partner(self, book_path: str, query: str) -> dict[str, Any]:
+    async def async_probe_partner(
+        self, book_path: str, query: str, partner: str | None = None
+    ) -> dict[str, Any]:
         """Read-only reconnaissance of the 2-player flow. Never books anything.
 
         Ten'Up serves its JavaScript from behind the waiting room, so the request
@@ -534,7 +574,33 @@ class TenupClient:
                     {"url": url, "method": "POST", "status": pstatus,
                      "final_path": pfinal.path, "body": _sample(ptext)}
                 )
+        if partner:
+            report["partner_parsed"] = parse_partner_choice(partner)
+            report["partner_attempts"] = []
+            for payload in partner_post_variants(post_data, partner):
+                added = sorted(set(payload) - set(post_data))
+                try:
+                    text, _, status = await self._request(
+                        "POST",
+                        f"{BASE_URL}/club/reservations/formule/ajax",
+                        headers={
+                            **_JSON_HEADERS,
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "Origin": BASE_URL,
+                            "Referer": urljoin(BASE_URL, book_path),
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                        data=payload,
+                    )
+                except TenupError as err:
+                    report["partner_attempts"].append({"keys": added, "error": str(err)})
+                    continue
+                report["partner_attempts"].append(
+                    {"keys": added, "status": status, "body": _sample(text)}
+                )
+
         report["js"] = []
+        report["js_scanned"] = []
         for url in script_urls(body):
             try:
                 text, _, status = await self._request("GET", url, headers=_HTML_HEADERS)
@@ -546,6 +612,7 @@ class TenupClient:
                 for needle in _JS_NEEDLES
                 if (found := find_snippets(text, needle, limit=2))
             }
+            report["js_scanned"].append(url.rsplit("/", 1)[-1][:40])
             if hits:
                 report["js"].append({"url": url, "status": status, "hits": hits})
         return report

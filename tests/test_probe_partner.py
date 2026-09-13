@@ -101,3 +101,39 @@ def test_formule_ajax_dedupes_when_the_page_base_repeats_a_fixed_base():
 def test_formule_ajax_is_empty_without_a_fragment():
     assert formule_ajax_candidates("/club/reservations/detail/1", "") == []
     assert formule_ajax_candidates("/club/reservations/detail/1", "/") == []
+
+
+def test_parse_partner_choice_splits_name_and_licence():
+    from custom_components.tenup.api import parse_partner_choice
+
+    assert parse_partner_choice("John DOE (111111111)") == ("John DOE", "111111111")
+    # The father and the son differ only by the identifier.
+    assert parse_partner_choice("Eric DOE (222222222)") == ("Eric DOE", "222222222")
+    assert parse_partner_choice("Richard ROE (1234)") == ("Richard ROE", "1234")
+
+
+def test_parse_partner_choice_refuses_a_label_without_an_identifier():
+    from custom_components.tenup.api import parse_partner_choice
+
+    assert parse_partner_choice("J. DOE") is None
+    assert parse_partner_choice("John DOE ()") is None
+    assert parse_partner_choice("John DOE (abc)") is None
+
+
+def test_partner_post_variants_keep_the_base_and_add_one_shape_each():
+    from custom_components.tenup.api import partner_post_variants
+
+    base = {"codeClub": "87654321", "idCourt": "21099"}
+    variants = partner_post_variants(base, "John DOE (111111111)")
+    assert len(variants) == 5
+    for payload in variants:
+        assert payload["codeClub"] == "87654321" and payload["idCourt"] == "21099"
+    assert variants[0]["joueur2_nom"] == "John DOE (111111111)"
+    assert variants[1]["idPartenaire"] == "111111111"
+    assert base == {"codeClub": "87654321", "idCourt": "21099"}  # jamais mute
+
+
+def test_partner_post_variants_is_empty_without_an_identifier():
+    from custom_components.tenup.api import partner_post_variants
+
+    assert partner_post_variants({"a": "b"}, "J. DOE") == []
