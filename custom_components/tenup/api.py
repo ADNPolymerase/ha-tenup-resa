@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from datetime import date, datetime
@@ -158,22 +159,36 @@ PARTNER_AUTOCOMPLETE_PATH = "/adherent/autocomplete/partenaire"
 _PROBE_SAMPLE = 400
 
 
-def partner_autocomplete_candidates(query: str) -> list[str]:
-    """The request shapes a Drupal autocomplete is usually served under.
+def _json_sample(value: Any, limit: int) -> str:
+    """Serialise a page structure for the probe report, bounded."""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)[:limit]
 
-    Ten'Up only gives us the path, never how the term is passed, so the probe
-    tries each shape once and reports which one answers.
+
+def partner_autocomplete_candidates(
+    query: str, path: str = PARTNER_AUTOCOMPLETE_PATH
+) -> list[str]:
+    """The request shapes a Drupal 7 autocomplete is usually served under.
+
+    ``path`` comes from the page itself (the joueur2_nom field advertises it):
+    beta.1 hardcoded it and every attempt answered 404. Note that ``?q=`` is
+    Drupal's own routing parameter, so a query-string form cannot carry a search
+    term here; it is kept only as a contrast case.
     """
     q = quote(query.strip(), safe="")
     if not q:
         raise ValueError("empty query")
-    return [
-        f"{PARTNER_AUTOCOMPLETE_PATH}/{q}",
-        f"{PARTNER_AUTOCOMPLETE_PATH}?q={q}",
-        f"{PARTNER_AUTOCOMPLETE_PATH}?term={q}",
-        f"{PARTNER_AUTOCOMPLETE_PATH}?search={q}",
-        f"{PARTNER_AUTOCOMPLETE_PATH}?keyword={q}",
-    ]
+    base = ("/" + path.lstrip("/")).rstrip("/")
+    out: list[str] = []
+    for candidate in (
+        f"{base}/{q}",
+        f"/fr{base}/{q}",
+        f"{base}/{q}?_wrapper_format=drupal_ajax",
+        f"/index.php?q={base.lstrip('/')}/{q}",
+        f"{base}?q={q}",
+    ):
+        if candidate not in out:
+            out.append(candidate)
+    return out
 
 
 def formule_ajax_candidates(book_path: str, url_fragment: str) -> list[str]:
@@ -386,39 +401,47 @@ class TenupClient:
             return None
 
     async def async_probe_partner(self, book_path: str, query: str) -> dict[str, Any]:
-        """Read-only reconnaissance of the 2-player flow. Never posts a booking.
+        """Read-only reconnaissance of the 2-player flow. Never books anything.
 
         Ten'Up serves its JavaScript from behind the waiting room, so the request
         shapes of the partner autocomplete and of ``formule/ajax`` cannot be read
-        anywhere but from a signed-in session. This tries them once each and
-        reports what answered, so the real booking code does not have to guess.
+        anywhere but from a signed-in session.
         """
         body, _ = await self._get_html(book_path)
         settings = extract_drupal_settings(body)
         detail = settings.get("reservation_detail") or {}
         params = detail.get("params_formule_joueur_ajax") or {}
         cotisation = detail.get("cotisation") or {}
+        fields = (detail.get("form") or {}).get("fields") or {}
 
         def _sample(text: str) -> str:
             return " ".join(text.split())[:_PROBE_SAMPLE]
 
+        # The joueur2 block is what we actually need to reproduce; dump it whole.
+        joueur2: dict[str, Any] = {}
+        for cot in cotisation.values():
+            candidate = (cot or {}).get("joueur2") or {}
+            if candidate:
+                joueur2 = candidate
+                break
+        nom_field = (joueur2.get("fields") or {}).get("joueur2_nom") or {}
+        auto_path = nom_field.get("autocomplete_path") or PARTNER_AUTOCOMPLETE_PATH
+
         report: dict[str, Any] = {
             "book_path": book_path,
-            # Dump the shapes rather than guessing at key names: the whole point
-            # of the probe is that we do not know them yet.
-            "detail_keys": sorted(detail),
-            "form_field_keys": sorted((detail.get("form") or {}).get("fields") or {}),
-            "ajax_params_keys": sorted(params),
+            "required_players": fields.get("nombre_joueur_obligatoire"),
+            "statut_invitation": fields.get("statut_invitation"),
+            "autocomplete_path_from_page": auto_path,
+            "joueur2_spec": _json_sample(joueur2, 2500),
+            "ajax_params": {k: v for k, v in params.items() if k != "url"},
             "ajax_url_fragment": params.get("url"),
-            "formule_ids": sorted(cotisation),
-            "joueur2_fields": sorted(
-                (cotisation.get(next(iter(cotisation), ""), {}).get("joueur2", {}).get("fields") or {})
-            ),
+            "ticket_restants": detail.get("ticketRestants"),
+            "paiement_en_ligne": detail.get("paiementEnLigneAutorise"),
             "autocomplete": [],
             "formule_ajax": [],
         }
 
-        for url in partner_autocomplete_candidates(query):
+        for url in partner_autocomplete_candidates(query, auto_path):
             try:
                 text, final, status = await self._request(
                     "GET", f"{BASE_URL}{url}", headers=_JSON_HEADERS
@@ -430,21 +453,43 @@ class TenupClient:
                 {"url": url, "status": status, "final_path": final.path, "body": _sample(text)}
             )
 
-        query = urlencode(
-            {k: str(v) for k, v in params.items() if k != "url" and v is not None}
-        )
+        post_data = {k: str(v) for k, v in params.items() if k != "url" and v is not None}
+        query_string = urlencode(post_data)
         for url in formule_ajax_candidates(book_path, params.get("url", "")):
-            target = f"{BASE_URL}{url}?{query}" if query else f"{BASE_URL}{url}"
+            target = f"{BASE_URL}{url}?{query_string}" if query_string else f"{BASE_URL}{url}"
             try:
                 text, final, status = await self._request(
                     "GET", target, headers=_JSON_HEADERS
                 )
             except TenupError as err:
-                report["formule_ajax"].append({"url": url, "error": str(err)})
+                report["formule_ajax"].append({"url": url, "method": "GET", "error": str(err)})
                 continue
             report["formule_ajax"].append(
-                {"url": url, "status": status, "final_path": final.path, "body": _sample(text)}
+                {"url": url, "method": "GET", "status": status,
+                 "final_path": final.path, "body": _sample(text)}
             )
+            # Only the endpoint that answers JSON is worth a POST.
+            if status == 200 and text.lstrip().startswith("{"):
+                try:
+                    ptext, pfinal, pstatus = await self._request(
+                        "POST",
+                        f"{BASE_URL}{url}",
+                        headers={
+                            **_JSON_HEADERS,
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "Origin": BASE_URL,
+                            "Referer": urljoin(BASE_URL, book_path),
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                        data=post_data,
+                    )
+                except TenupError as err:
+                    report["formule_ajax"].append({"url": url, "method": "POST", "error": str(err)})
+                    continue
+                report["formule_ajax"].append(
+                    {"url": url, "method": "POST", "status": pstatus,
+                     "final_path": pfinal.path, "body": _sample(ptext)}
+                )
         return report
 
     async def async_book(self, slot: Slot) -> str:
