@@ -13,5 +13,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/ADNPolymerase/ha-tenup-resa/issues",
   "requirements": [],
-  "version": "0.5.0-beta.5"
+  "version": "0.5.0-beta.6"
 }
