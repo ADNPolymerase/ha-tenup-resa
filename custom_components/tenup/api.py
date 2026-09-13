@@ -165,11 +165,12 @@ PARTNER_AUTOCOMPLETE_PATH = "/adherent/autocomplete/partenaire"
 # autocomplete_path the page advertises and hardcodes this one.
 JOUEUR_AUTOCOMPLETE_PATH = "/club/autocomplete/partenaire"
 _PROBE_SAMPLE = 400
-_JS_RADIUS = 520
+_JS_RADIUS = 700
 _JS_NEEDLES = (
-    "postParams",
-    "ajaxUrl",
-    "joueurName",
+    "formValues",
+    "reservation_detail_submit",
+    "detail/submit",
+    "joueur2_nom",
 )
 _MAX_JS_ASSETS = 25
 _SCRIPT_SRC_RE = re.compile(r'<script[^>]+src="([^"]+)"', re.I)
