@@ -459,7 +459,9 @@ def resolve_partner(
     out = []
     for choice, display in results:
         haystack = re.split(r"[^0-9a-z]+", _fold(display))
-        if all(w in haystack for w in words):
+        # Prefix, not whole word: Ten'Up answers "Do" for DOE, so a
+        # truncated or half-typed name must not be thrown away here.
+        if all(any(h.startswith(w) for h in haystack) for w in words):
             out.append((choice, display))
     return out
 

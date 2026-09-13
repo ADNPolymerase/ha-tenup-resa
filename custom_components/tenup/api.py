@@ -30,6 +30,8 @@ from .parser import (
     parse_messages,
     parse_partner_results,
     parse_planning,
+    partner_search_term,
+    resolve_partner,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -630,9 +632,13 @@ class TenupClient:
 
     async def async_search_partner(self, query: str) -> list[tuple[str, str]]:
         """Search a club member to play with, the way the site's own field does."""
-        term = query.strip()
-        if len(term) < 3:
+        wanted = " ".join(query.split())
+        if len(wanted) < 3:
             raise TenupBookingError("Indiquez au moins 3 caracteres pour chercher un partenaire")
+        # Ten'Up searches ONE word: "Do eric" answers nothing at all, while
+        # "Do" answers both DOE. So send a single term, then narrow the
+        # answer with everything that was typed.
+        term = partner_search_term(wanted)
         text, _final, status = await self._request(
             "GET",
             f"{BASE_URL}{JOUEUR_AUTOCOMPLETE_PATH}/{quote(term, safe='')}",
@@ -640,7 +646,11 @@ class TenupClient:
         )
         if status >= 500:
             raise TenupConnectionError(f"Ten'Up answered {status} on the partner search")
-        return parse_partner_results(text)
+        results = parse_partner_results(text)
+        if len(wanted.split()) > 1:
+            # Keep the wider list when nothing matches, rather than show nothing.
+            return resolve_partner(results, wanted) or results
+        return results
 
     async def async_partner_formulas(
         self, book_path: str, user_id: str

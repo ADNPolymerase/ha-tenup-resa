@@ -167,3 +167,25 @@ def test_partner_search_term_falls_back_when_every_word_is_too_short():
     from custom_components.tenup.parser import partner_search_term
 
     assert partner_search_term("Li Wu") == "Li Wu"
+
+
+def test_resolve_partner_matches_a_truncated_name():
+    from custom_components.tenup.parser import resolve_partner
+
+    # Mesure du 2026-09-13: Ten'Up repond a "Do" comme a "DOE", donc un
+    # nom tronque ne doit pas etre rejete par notre filtrage.
+    assert resolve_partner(RESULTS, "Do eric") == [
+        ("Eric DOE (222222222)", "Eric DOE")
+    ]
+    assert len(resolve_partner(RESULTS, "Do")) == 2
+    assert resolve_partner(RESULTS, "John Do") == [
+        ("John DOE (111111111)", "John DOE")
+    ]
+
+
+def test_resolve_partner_still_refuses_an_unrelated_name():
+    from custom_components.tenup.parser import resolve_partner
+
+    # Un prefixe ne doit pas tout laisser passer.
+    assert resolve_partner(RESULTS, "Zoe") == []
+    assert resolve_partner(RESULTS, "erdrix") == []
