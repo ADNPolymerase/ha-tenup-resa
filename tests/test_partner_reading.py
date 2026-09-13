@@ -157,7 +157,9 @@ def test_partner_search_term_sends_a_word_the_site_answers_to():
 
     # Mesure du 2026-09-13: /club/autocomplete/partenaire/John repond bien,
     # donc l autocompletion matche le prenom comme le nom de famille.
-    assert partner_search_term("John DOE (111111111)") == "DOE"
+    assert partner_search_term("John DOE (111111111)") == "John"
+    # Et quand le nom est le mot le plus long, c est lui qui part.
+    assert partner_search_term("Al ROBINSON (444444444)") == "ROBINSON"
     assert partner_search_term("DOE") == "DOE"
     assert partner_search_term("Richard ROE") == "Richard"
     # L ancienne liste de JD contient "J. DOE": l initiale est trop courte
