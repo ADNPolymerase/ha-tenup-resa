@@ -28,7 +28,6 @@ MAX_PLAYER_LOOKUPS = 80
 
 SERVICE_BOOK = "book"
 SERVICE_CANCEL = "cancel"
-SERVICE_PROBE_PARTNER = "probe_partner"
 
 ATTR_COURT_ID = "court_id"
 ATTR_START = "start"

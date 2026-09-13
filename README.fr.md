@@ -67,6 +67,7 @@ service: tenup.book
 data:
   court_id: "21100"          # voir les attributs des capteurs ou la commande planning
   start: "2026-09-10 21:00:00"
+  partner: "John DOE"   # seulement pour un court qui demande deux joueurs
 ```
 
 ```yaml
@@ -77,7 +78,7 @@ data:
 
 Les deux services renvoient une réponse (`response_variable`) et lèvent une erreur lisible quand Ten'Up refuse (par exemple la règle du club sur les réservations simultanées).
 
-Seuls les créneaux à un joueur sont réservables pour l'instant. Les courts qui demandent deux joueurs (partenaire) renvoient une erreur explicite.
+Les courts qui demandent deux joueurs sont réservables également. Indiquez `partner` avec un nom : l'intégration cherche parmi les adhérents du club, refuse de trancher entre homonymes et vous demande alors le prénom, puis choisit une formule gratuite. Une option payante n'est jamais sélectionnée.
 
 ## À savoir
 

@@ -206,3 +206,52 @@ def test_post_data_writes_the_partner_as_the_json_the_page_holds():
 def test_post_data_keeps_a_choice_without_an_identifier_as_is():
     data = _form(partner_choice="John DOE").as_post_data()
     assert data["joueur2_nom"] == "John DOE"
+
+
+# --- migres depuis les tests de la sonde: ces fonctions restent en production ---
+
+def test_parse_partner_choice_splits_name_and_licence():
+    from custom_components.tenup.api import parse_partner_choice
+
+    assert parse_partner_choice("John DOE (111111111)") == ("John DOE", "111111111")
+    # The father and the son differ only by the identifier.
+    assert parse_partner_choice("Eric DOE (222222222)") == ("Eric DOE", "222222222")
+    assert parse_partner_choice("Richard ROE (1234)") == ("Richard ROE", "1234")
+
+
+def test_parse_partner_choice_refuses_a_label_without_an_identifier():
+    from custom_components.tenup.api import parse_partner_choice
+
+    assert parse_partner_choice("J. DOE") is None
+    assert parse_partner_choice("John DOE ()") is None
+    assert parse_partner_choice("John DOE (abc)") is None
+
+
+def test_formule_ajax_payload_carries_userid_and_currentformule():
+    from custom_components.tenup.api import formule_ajax_payload
+
+    params = {"codeClub": "87654321", "ticketAutorises": True, "url": "formule/ajax"}
+    body = formule_ajax_payload(params, "111111111", "18332817")
+    assert body["userId"] == "111111111"
+    assert body["currentFormule"] == "18332817"
+    assert body["codeClub"] == "87654321"
+    # url sert d adresse, il ne doit pas rester dans le corps
+    assert "url" not in body
+
+
+def test_formule_ajax_payload_renders_booleans_the_way_qs_stringify_does():
+    from custom_components.tenup.api import formule_ajax_payload
+
+    body = formule_ajax_payload({"a": True, "b": False, "c": 12, "d": None}, "1")
+    assert body["a"] == "true" and body["b"] == "false"
+    assert body["c"] == "12"
+    assert "d" not in body  # une valeur nulle n est pas envoyee
+
+
+def test_formule_ajax_payload_defaults_currentformule_to_empty_and_keeps_base_intact():
+    from custom_components.tenup.api import formule_ajax_payload
+
+    params = {"codeClub": "87654321"}
+    assert formule_ajax_payload(params, "1")["currentFormule"] == ""
+    assert formule_ajax_payload(params, "1", None)["currentFormule"] == ""
+    assert params == {"codeClub": "87654321"}

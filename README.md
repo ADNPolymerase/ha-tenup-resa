@@ -67,6 +67,7 @@ service: tenup.book
 data:
   court_id: "21100"          # see the attributes of the sensors or the planning command
   start: "2026-09-10 21:00:00"
+  partner: "John DOE"   # only for a court that needs two players
 ```
 
 ```yaml
@@ -77,7 +78,7 @@ data:
 
 Both services return a response (`response_variable`) and raise a readable error when Ten'Up refuses (for example the club rule on simultaneous reservations).
 
-Only slots that require a single player are bookable for now. Courts that require two players (partner) are reported with an explicit error.
+Courts that require two players are bookable too. Pass `partner` with a name: the integration searches the club members, refuses to choose between namesakes and asks you to give the first name, then picks a formula that costs nothing. A paid option is never selected.
 
 ## Notes
 

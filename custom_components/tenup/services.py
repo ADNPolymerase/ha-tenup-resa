@@ -18,11 +18,9 @@ from .const import (
     DOMAIN,
     SERVICE_BOOK,
     SERVICE_CANCEL,
-    SERVICE_PROBE_PARTNER,
 )
 
 ATTR_ENTRY_ID = "entry_id"
-ATTR_QUERY = "query"
 ATTR_PARTNER = "partner"
 
 BOOK_SCHEMA = vol.Schema(
@@ -30,15 +28,6 @@ BOOK_SCHEMA = vol.Schema(
         vol.Optional(ATTR_ENTRY_ID): cv.string,
         vol.Required(ATTR_COURT_ID): cv.string,
         vol.Required(ATTR_START): cv.datetime,
-        vol.Optional(ATTR_PARTNER): cv.string,
-    }
-)
-PROBE_SCHEMA = vol.Schema(
-    {
-        vol.Optional(ATTR_ENTRY_ID): cv.string,
-        vol.Required(ATTR_COURT_ID): cv.string,
-        vol.Required(ATTR_START): cv.datetime,
-        vol.Required(ATTR_QUERY): cv.string,
         vol.Optional(ATTR_PARTNER): cv.string,
     }
 )
@@ -127,36 +116,5 @@ def async_setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError(f"Ten'Up injoignable: {err}") from err
         return {"court_id": slot.court_id, "court_name": slot.court_name, "start": slot.start.isoformat(), "reservation_id": slot.reservation_id, "cancelled": True}
 
-    async def _probe_partner(call: ServiceCall) -> ServiceResponse:
-        """Read-only reconnaissance of the 2-player flow. Never books anything."""
-        coordinator = _coordinators(hass, call.data.get(ATTR_ENTRY_ID))[0]
-        start = _as_local(call.data[ATTR_START])
-        slot = coordinator.data.find_slot(call.data[ATTR_COURT_ID], start)
-        if slot is None or not slot.book_path:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="slot_unknown",
-                translation_placeholders={
-                    "court": call.data[ATTR_COURT_ID],
-                    "start": start.isoformat(),
-                },
-            )
-        try:
-            return await coordinator.client.async_probe_partner(
-                slot.book_path, call.data[ATTR_QUERY], call.data.get(ATTR_PARTNER)
-            )
-        except TenupAuthError as err:
-            coordinator.entry.async_start_reauth(hass)
-            raise HomeAssistantError(f"Ten'Up: session expiree ({err})") from err
-        except TenupConnectionError as err:
-            raise HomeAssistantError(f"Ten'Up injoignable: {err}") from err
-
     hass.services.async_register(DOMAIN, SERVICE_BOOK, _book, schema=BOOK_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
     hass.services.async_register(DOMAIN, SERVICE_CANCEL, _cancel, schema=CANCEL_SCHEMA, supports_response=SupportsResponse.OPTIONAL)
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_PROBE_PARTNER,
-        _probe_partner,
-        schema=PROBE_SCHEMA,
-        supports_response=SupportsResponse.ONLY,
-    )
