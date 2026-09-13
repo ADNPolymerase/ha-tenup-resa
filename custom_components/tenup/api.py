@@ -157,6 +157,9 @@ def new_session() -> aiohttp.ClientSession:
 
 PARTNER_AUTOCOMPLETE_PATH = "/adherent/autocomplete/partenaire"
 _PROBE_SAMPLE = 400
+_JS_RADIUS = 260
+_MAX_JS_ASSETS = 14
+_SCRIPT_SRC_RE = re.compile(r'<script[^>]+src="([^"]+)"', re.I)
 
 
 def _json_sample(value: Any, limit: int) -> str:
@@ -167,25 +170,20 @@ def _json_sample(value: Any, limit: int) -> str:
 def partner_autocomplete_candidates(
     query: str, path: str = PARTNER_AUTOCOMPLETE_PATH
 ) -> list[str]:
-    """The request shapes a Drupal 7 autocomplete is usually served under.
+    """Where a Ten'Up custom autocomplete component might actually be served.
 
-    ``path`` comes from the page itself (the joueur2_nom field advertises it):
-    beta.1 hardcoded it and every attempt answered 404. Note that ``?q=`` is
-    Drupal's own routing parameter, so a query-string form cannot carry a search
-    term here; it is kept only as a contrast case.
+    joueur2_nom is not a Drupal core autocomplete: it is a custom component
+    (custom_tenup_recherche_joueur_autocomplete) and its autocomplete_path is a
+    fragment the component prefixes with a base we cannot see. formule/ajax
+    turned out to live under /club/reservations, so try the same bases here.
     """
     q = quote(query.strip(), safe="")
     if not q:
         raise ValueError("empty query")
     base = ("/" + path.lstrip("/")).rstrip("/")
     out: list[str] = []
-    for candidate in (
-        f"{base}/{q}",
-        f"/fr{base}/{q}",
-        f"{base}/{q}?_wrapper_format=drupal_ajax",
-        f"/index.php?q={base.lstrip('/')}/{q}",
-        f"{base}?q={q}",
-    ):
+    for prefix in ("", "/club/reservations", "/club", "/back/v2", "/fr"):
+        candidate = f"{prefix}{base}/{q}"
         if candidate not in out:
             out.append(candidate)
     return out
@@ -204,6 +202,38 @@ def formule_ajax_candidates(book_path: str, url_fragment: str) -> list[str]:
         candidate = urljoin(base, frag)
         if candidate not in out:
             out.append(candidate)
+    return out
+
+
+def script_urls(html: str, limit: int = _MAX_JS_ASSETS) -> list[str]:
+    """The page's own JS bundles, absolute.
+
+    Their source is the only place that states how autocomplete_path is turned
+    into a real request. The public copies sit behind the waiting room, but a
+    signed-in session fetches them normally.
+    """
+    out: list[str] = []
+    for src in _SCRIPT_SRC_RE.findall(html):
+        if ".js" not in src:
+            continue
+        url = src if src.startswith("http") else urljoin(BASE_URL, src)
+        if url not in out:
+            out.append(url)
+    return out[:limit]
+
+
+def find_snippets(
+    text: str, needle: str, radius: int = _JS_RADIUS, limit: int = 3
+) -> list[str]:
+    """Bounded context around each occurrence, so a multi-MB bundle stays readable."""
+    out: list[str] = []
+    start = 0
+    while len(out) < limit:
+        i = text.find(needle, start)
+        if i < 0:
+            break
+        out.append(" ".join(text[max(0, i - radius) : i + radius + len(needle)].split()))
+        start = i + len(needle)
     return out
 
 
@@ -490,6 +520,24 @@ class TenupClient:
                     {"url": url, "method": "POST", "status": pstatus,
                      "final_path": pfinal.path, "body": _sample(ptext)}
                 )
+        report["js"] = []
+        for url in script_urls(body):
+            try:
+                text, _, status = await self._request("GET", url, headers=_HTML_HEADERS)
+            except TenupError as err:
+                report["js"].append({"url": url, "error": str(err)})
+                continue
+            hits = {
+                needle: found
+                for needle in (
+                    "autocomplete_path",
+                    "custom_tenup_recherche_joueur_autocomplete",
+                    "autocomplete/partenaire",
+                )
+                if (found := find_snippets(text, needle))
+            }
+            if hits:
+                report["js"].append({"url": url, "status": status, "hits": hits})
         return report
 
     async def async_book(self, slot: Slot) -> str:

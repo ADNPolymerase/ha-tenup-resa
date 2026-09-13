@@ -1,25 +1,29 @@
-"""The probe's URL builders are pure: pin them before trusting the field test."""
+"""The probe's pure helpers: pin them before trusting a field test."""
 
 import pytest
 
 from custom_components.tenup.api import (
     PARTNER_AUTOCOMPLETE_PATH,
+    find_snippets,
     formule_ajax_candidates,
     partner_autocomplete_candidates,
+    script_urls,
 )
 
 
-def test_autocomplete_tries_the_drupal_path_form_first():
-    urls = partner_autocomplete_candidates("Moss")
-    assert urls[0] == f"{PARTNER_AUTOCOMPLETE_PATH}/Moss"
-    assert len(urls) == len(set(urls)) == 5
+def test_autocomplete_sweeps_the_bases_a_custom_component_might_use():
+    assert partner_autocomplete_candidates("Moss") == [
+        "/adherent/autocomplete/partenaire/Moss",
+        "/club/reservations/adherent/autocomplete/partenaire/Moss",
+        "/club/adherent/autocomplete/partenaire/Moss",
+        "/back/v2/adherent/autocomplete/partenaire/Moss",
+        "/fr/adherent/autocomplete/partenaire/Moss",
+    ]
 
 
 def test_autocomplete_honours_the_path_advertised_by_the_page():
-    # beta.1 hardcoded the fixture's path and every attempt 404'd; the page
-    # advertises its own, so the builder must use it.
-    urls = partner_autocomplete_candidates("Moss", "/club/autocomplete/partenaire")
-    assert urls[0] == "/club/autocomplete/partenaire/Moss"
+    urls = partner_autocomplete_candidates("Moss", "/club/autocomplete/xyz")
+    assert urls[0] == "/club/autocomplete/xyz/Moss"
     assert all("/adherent/" not in u for u in urls)
 
 
@@ -44,9 +48,36 @@ def test_autocomplete_refuses_an_empty_query(bad):
         partner_autocomplete_candidates(bad)
 
 
+def test_script_urls_keeps_only_js_and_absolutises():
+    html = (
+        '<script src="/sites/default/files/a.js"></script>'
+        '<script src="https://cdn.example.com/b.js?v=2"></script>'
+        '<script src="/themes/style.css"></script>'
+        "<script>var inline = 1</script>"
+    )
+    assert script_urls(html) == [
+        "https://tenup.fft.fr/sites/default/files/a.js",
+        "https://cdn.example.com/b.js?v=2",
+    ]
+
+
+def test_script_urls_dedupes_and_respects_the_limit():
+    html = '<script src="/a.js"></script>' * 3 + '<script src="/b.js"></script>'
+    assert script_urls(html) == ["https://tenup.fft.fr/a.js", "https://tenup.fft.fr/b.js"]
+    assert script_urls(html, limit=1) == ["https://tenup.fft.fr/a.js"]
+
+
+def test_find_snippets_bounds_each_hit_and_respects_the_limit():
+    text = "x" * 500 + "NEEDLE" + "y" * 500 + "NEEDLE" + "z" * 500
+    one = find_snippets(text, "NEEDLE", radius=10, limit=1)
+    assert len(one) == 1 and "NEEDLE" in one[0]
+    assert len(one[0]) <= 10 + len("NEEDLE") + 10
+    assert len(find_snippets(text, "NEEDLE", radius=10)) == 2
+    assert find_snippets(text, "ABSENT") == []
+
+
 def test_formule_ajax_covers_the_plausible_bases_without_duplicates():
-    urls = formule_ajax_candidates("/club/reservations/detail/12345", "formule/ajax")
-    assert urls == [
+    assert formule_ajax_candidates("/club/reservations/detail/12345", "formule/ajax") == [
         "/club/reservations/formule/ajax",
         "/club/formule/ajax",
         "/formule/ajax",
