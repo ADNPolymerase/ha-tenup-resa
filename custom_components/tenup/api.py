@@ -156,8 +156,17 @@ def new_session() -> aiohttp.ClientSession:
 
 
 PARTNER_AUTOCOMPLETE_PATH = "/adherent/autocomplete/partenaire"
+# What RechercheJoueurAutocomplete actually calls: it ignores the
+# autocomplete_path the page advertises and hardcodes this one.
+JOUEUR_AUTOCOMPLETE_PATH = "/club/autocomplete/partenaire"
 _PROBE_SAMPLE = 400
-_JS_RADIUS = 260
+_JS_RADIUS = 320
+_JS_NEEDLES = (
+    "autocomplete/partenaire",
+    "formule/ajax",
+    "joueur2_formule",
+    "detail/submit",
+)
 _MAX_JS_ASSETS = 14
 _SCRIPT_SRC_RE = re.compile(r'<script[^>]+src="([^"]+)"', re.I)
 
@@ -170,20 +179,24 @@ def _json_sample(value: Any, limit: int) -> str:
 def partner_autocomplete_candidates(
     query: str, path: str = PARTNER_AUTOCOMPLETE_PATH
 ) -> list[str]:
-    """Where a Ten'Up custom autocomplete component might actually be served.
+    """Where the partner autocomplete really lives, page claims notwithstanding.
 
-    joueur2_nom is not a Drupal core autocomplete: it is a custom component
-    (custom_tenup_recherche_joueur_autocomplete) and its autocomplete_path is a
-    fragment the component prefixes with a base we cannot see. formule/ajax
-    turned out to live under /club/reservations, so try the same bases here.
+    The page advertises autocomplete_path on joueur2_nom, but the component that
+    consumes it (RechercheJoueurAutocomplete) ignores the prop and calls
+    /club/autocomplete/partenaire/<term>. The advertised path is kept as a
+    fallback in case another club or a later build honours it.
     """
     q = quote(query.strip(), safe="")
     if not q:
         raise ValueError("empty query")
-    base = ("/" + path.lstrip("/")).rstrip("/")
+    advertised = ("/" + path.lstrip("/")).rstrip("/")
     out: list[str] = []
-    for prefix in ("", "/club/reservations", "/club", "/back/v2", "/fr"):
-        candidate = f"{prefix}{base}/{q}"
+    for candidate in (
+        f"{JOUEUR_AUTOCOMPLETE_PATH}/{q}",
+        f"{JOUEUR_AUTOCOMPLETE_PATH}/{q}?term={q}",
+        f"/club/reservations{advertised}/{q}",
+        f"{advertised}/{q}",
+    ):
         if candidate not in out:
             out.append(candidate)
     return out
@@ -480,7 +493,8 @@ class TenupClient:
                 report["autocomplete"].append({"url": url, "error": str(err)})
                 continue
             report["autocomplete"].append(
-                {"url": url, "status": status, "final_path": final.path, "body": _sample(text)}
+                {"url": url, "status": status, "final_path": final.path,
+                 "body": " ".join(text.split())[:900]}
             )
 
         post_data = {k: str(v) for k, v in params.items() if k != "url" and v is not None}
@@ -529,12 +543,8 @@ class TenupClient:
                 continue
             hits = {
                 needle: found
-                for needle in (
-                    "autocomplete_path",
-                    "custom_tenup_recherche_joueur_autocomplete",
-                    "autocomplete/partenaire",
-                )
-                if (found := find_snippets(text, needle))
+                for needle in _JS_NEEDLES
+                if (found := find_snippets(text, needle, limit=2))
             }
             if hits:
                 report["js"].append({"url": url, "status": status, "hits": hits})

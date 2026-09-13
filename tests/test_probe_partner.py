@@ -3,6 +3,7 @@
 import pytest
 
 from custom_components.tenup.api import (
+    JOUEUR_AUTOCOMPLETE_PATH,
     PARTNER_AUTOCOMPLETE_PATH,
     find_snippets,
     formule_ajax_candidates,
@@ -11,28 +12,30 @@ from custom_components.tenup.api import (
 )
 
 
-def test_autocomplete_sweeps_the_bases_a_custom_component_might_use():
-    assert partner_autocomplete_candidates("Moss") == [
-        "/adherent/autocomplete/partenaire/Moss",
+def test_autocomplete_calls_the_url_the_bundle_hardcodes_first():
+    # RechercheJoueurAutocomplete ignores autocomplete_path and calls this.
+    urls = partner_autocomplete_candidates("Moss")
+    assert urls[0] == f"{JOUEUR_AUTOCOMPLETE_PATH}/Moss"
+    assert urls == [
+        "/club/autocomplete/partenaire/Moss",
+        "/club/autocomplete/partenaire/Moss?term=Moss",
         "/club/reservations/adherent/autocomplete/partenaire/Moss",
-        "/club/adherent/autocomplete/partenaire/Moss",
-        "/back/v2/adherent/autocomplete/partenaire/Moss",
-        "/fr/adherent/autocomplete/partenaire/Moss",
+        "/adherent/autocomplete/partenaire/Moss",
     ]
 
 
-def test_autocomplete_honours_the_path_advertised_by_the_page():
+def test_autocomplete_still_keeps_the_advertised_path_as_a_fallback():
     urls = partner_autocomplete_candidates("Moss", "/club/autocomplete/xyz")
-    assert urls[0] == "/club/autocomplete/xyz/Moss"
-    assert all("/adherent/" not in u for u in urls)
+    assert urls[0] == f"{JOUEUR_AUTOCOMPLETE_PATH}/Moss"
+    assert "/club/autocomplete/xyz/Moss" in urls
 
 
 @pytest.mark.parametrize(
     "given", ["adherent/autocomplete/partenaire", "/adherent/autocomplete/partenaire/"]
 )
 def test_autocomplete_normalises_the_page_path(given):
-    assert partner_autocomplete_candidates("Moss", given)[0] == (
-        f"{PARTNER_AUTOCOMPLETE_PATH}/Moss"
+    assert f"{PARTNER_AUTOCOMPLETE_PATH}/Moss" in partner_autocomplete_candidates(
+        "Moss", given
     )
 
 
