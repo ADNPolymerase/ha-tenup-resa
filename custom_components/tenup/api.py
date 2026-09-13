@@ -8,7 +8,7 @@ import re
 from datetime import date, datetime
 from http.cookies import SimpleCookie
 from typing import Any
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urlencode, urljoin, urlsplit
 
 import aiohttp
 from yarl import URL
@@ -19,6 +19,7 @@ from .parser import (
     Planning,
     Slot,
     TenupParseError,
+    extract_drupal_settings,
     interstitial_reason,
     is_logged_in,
     looks_signed_out,
@@ -151,6 +152,44 @@ def new_session() -> aiohttp.ClientSession:
     Must be called from within a running event loop.
     """
     return aiohttp.ClientSession(cookie_jar=new_cookie_jar())
+
+
+PARTNER_AUTOCOMPLETE_PATH = "/adherent/autocomplete/partenaire"
+_PROBE_SAMPLE = 400
+
+
+def partner_autocomplete_candidates(query: str) -> list[str]:
+    """The request shapes a Drupal autocomplete is usually served under.
+
+    Ten'Up only gives us the path, never how the term is passed, so the probe
+    tries each shape once and reports which one answers.
+    """
+    q = quote(query.strip(), safe="")
+    if not q:
+        raise ValueError("empty query")
+    return [
+        f"{PARTNER_AUTOCOMPLETE_PATH}/{q}",
+        f"{PARTNER_AUTOCOMPLETE_PATH}?q={q}",
+        f"{PARTNER_AUTOCOMPLETE_PATH}?term={q}",
+        f"{PARTNER_AUTOCOMPLETE_PATH}?search={q}",
+        f"{PARTNER_AUTOCOMPLETE_PATH}?keyword={q}",
+    ]
+
+
+def formule_ajax_candidates(book_path: str, url_fragment: str) -> list[str]:
+    """``params_formule_joueur_ajax.url`` is relative and Ten'Up never says to what."""
+    frag = (url_fragment or "").strip("/")
+    if not frag:
+        return []
+    bases = ["/club/reservations/", "/club/", "/"]
+    if book_path:
+        bases.append(urljoin(book_path if book_path.startswith("/") else "/" + book_path, "./"))
+    out: list[str] = []
+    for base in bases:
+        candidate = urljoin(base, frag)
+        if candidate not in out:
+            out.append(candidate)
+    return out
 
 
 class TenupClient:
@@ -345,6 +384,68 @@ class TenupClient:
             return parse_booking_form(body).required_players
         except (TenupParseError, TenupError):
             return None
+
+    async def async_probe_partner(self, book_path: str, query: str) -> dict[str, Any]:
+        """Read-only reconnaissance of the 2-player flow. Never posts a booking.
+
+        Ten'Up serves its JavaScript from behind the waiting room, so the request
+        shapes of the partner autocomplete and of ``formule/ajax`` cannot be read
+        anywhere but from a signed-in session. This tries them once each and
+        reports what answered, so the real booking code does not have to guess.
+        """
+        body, _ = await self._get_html(book_path)
+        settings = extract_drupal_settings(body)
+        detail = settings.get("reservation_detail") or {}
+        params = detail.get("params_formule_joueur_ajax") or {}
+        cotisation = detail.get("cotisation") or {}
+
+        def _sample(text: str) -> str:
+            return " ".join(text.split())[:_PROBE_SAMPLE]
+
+        report: dict[str, Any] = {
+            "book_path": book_path,
+            # Dump the shapes rather than guessing at key names: the whole point
+            # of the probe is that we do not know them yet.
+            "detail_keys": sorted(detail),
+            "form_field_keys": sorted((detail.get("form") or {}).get("fields") or {}),
+            "ajax_params_keys": sorted(params),
+            "ajax_url_fragment": params.get("url"),
+            "formule_ids": sorted(cotisation),
+            "joueur2_fields": sorted(
+                (cotisation.get(next(iter(cotisation), ""), {}).get("joueur2", {}).get("fields") or {})
+            ),
+            "autocomplete": [],
+            "formule_ajax": [],
+        }
+
+        for url in partner_autocomplete_candidates(query):
+            try:
+                text, final, status = await self._request(
+                    "GET", f"{BASE_URL}{url}", headers=_JSON_HEADERS
+                )
+            except TenupError as err:
+                report["autocomplete"].append({"url": url, "error": str(err)})
+                continue
+            report["autocomplete"].append(
+                {"url": url, "status": status, "final_path": final.path, "body": _sample(text)}
+            )
+
+        query = urlencode(
+            {k: str(v) for k, v in params.items() if k != "url" and v is not None}
+        )
+        for url in formule_ajax_candidates(book_path, params.get("url", "")):
+            target = f"{BASE_URL}{url}?{query}" if query else f"{BASE_URL}{url}"
+            try:
+                text, final, status = await self._request(
+                    "GET", target, headers=_JSON_HEADERS
+                )
+            except TenupError as err:
+                report["formule_ajax"].append({"url": url, "error": str(err)})
+                continue
+            report["formule_ajax"].append(
+                {"url": url, "status": status, "final_path": final.path, "body": _sample(text)}
+            )
+        return report
 
     async def async_book(self, slot: Slot) -> str:
         """Book a free slot for the account owner alone. Returns the confirmation text."""
