@@ -382,7 +382,21 @@ class BookingForm:
             self.submit_name: self.submit_value,
         }
         if self.partner_choice:
-            data["joueur2_nom"] = self.partner_choice
+            # Measured in the page: joueur2_nom is a HIDDEN field holding JSON,
+            # {"id":"111111111","name":"John DOE"}, not the autocomplete
+            # key. Sending the key made Ten'Up answer "un second joueur est
+            # necessaire" because it read no player at all. Separators are tight
+            # and id comes first, as the site writes it.
+            parsed = _PARTNER_CHOICE_RE.match(self.partner_choice.strip())
+            data["joueur2_nom"] = (
+                json.dumps(
+                    {"id": parsed.group("ident"), "name": parsed.group("name").strip()},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                if parsed is not None
+                else self.partner_choice
+            )
         if self.partner_formula:
             data["joueur2_formule"] = self.partner_formula
         return data

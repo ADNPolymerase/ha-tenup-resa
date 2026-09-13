@@ -81,7 +81,9 @@ def test_post_data_carries_the_partner_choice_and_formula():
     data = _form(
         partner_choice="John DOE (111111111)", partner_formula="17761992"
     ).as_post_data()
-    assert data["joueur2_nom"] == "John DOE (111111111)"
+    # La forme exacte de joueur2_nom est verifiee par le test dedie ci-dessous:
+    # ici on controle seulement qu il est present et que joueur1 n est pas altere.
+    assert "joueur2_nom" in data
     assert data["joueur2_formule"] == "17761992"
     # le joueur 1 n est pas altere
     assert data["joueur1_formule"] == "18332791"
@@ -189,3 +191,18 @@ def test_resolve_partner_still_refuses_an_unrelated_name():
     # Un prefixe ne doit pas tout laisser passer.
     assert resolve_partner(RESULTS, "Zoe") == []
     assert resolve_partner(RESULTS, "erdrix") == []
+
+
+def test_post_data_writes_the_partner_as_the_json_the_page_holds():
+    # Releve dans le DOM du vrai formulaire le 2026-09-13: le champ cache
+    # joueur2_nom contient {"id":"111111111","name":"John DOE"}.
+    data = _form(
+        partner_choice="John DOE (111111111)", partner_formula="17761992"
+    ).as_post_data()
+    assert data["joueur2_nom"] == '{"id":"111111111","name":"John DOE"}'
+    assert data["joueur2_formule"] == "17761992"
+
+
+def test_post_data_keeps_a_choice_without_an_identifier_as_is():
+    data = _form(partner_choice="John DOE").as_post_data()
+    assert data["joueur2_nom"] == "John DOE"
