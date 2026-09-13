@@ -160,11 +160,11 @@ PARTNER_AUTOCOMPLETE_PATH = "/adherent/autocomplete/partenaire"
 # autocomplete_path the page advertises and hardcodes this one.
 JOUEUR_AUTOCOMPLETE_PATH = "/club/autocomplete/partenaire"
 _PROBE_SAMPLE = 400
-_JS_RADIUS = 320
+_JS_RADIUS = 520
 _JS_NEEDLES = (
-    "ajaxParams",
-    "formules",
-    "detail/submit",
+    "postParams",
+    "ajaxUrl",
+    "joueurName",
 )
 _MAX_JS_ASSETS = 25
 _SCRIPT_SRC_RE = re.compile(r'<script[^>]+src="([^"]+)"', re.I)
@@ -249,31 +249,6 @@ def partner_post_variants(base: dict[str, str], label: str) -> list[dict[str, st
         payload = dict(base)
         payload.update(extra)
         out.append(payload)
-    return out
-
-
-def json_payload_variants(
-    base: dict[str, Any], partner: str | None
-) -> list[tuple[str, dict[str, Any]]]:
-    """Payloads to try against formule/ajax, as (label, body).
-
-    The page reaches it through axios, which sends an object as JSON, so the
-    form-encoded attempts were very likely rejected on the encoding alone. The
-    partner-less variant comes first: if it fails differently from the
-    form-encoded one, the encoding is what mattered.
-    """
-    out: list[tuple[str, dict[str, Any]]] = [("sans partenaire", dict(base))]
-    parsed = parse_partner_choice(partner or "")
-    if parsed is None:
-        return out
-    _name, ident = parsed
-    for label, extra in (
-        ("joueur2_nom", {"joueur2_nom": partner}),
-        ("idPartenaire", {"idPartenaire": ident}),
-    ):
-        payload = dict(base)
-        payload.update(extra)
-        out.append((label, payload))
     return out
 
 
@@ -619,29 +594,6 @@ class TenupClient:
                 report["partner_attempts"].append(
                     {"keys": added, "status": status, "body": _sample(text)}
                 )
-
-        json_base = {k: v for k, v in params.items() if k != "url"}
-        report["json_attempts"] = []
-        for label, payload in json_payload_variants(json_base, partner):
-            try:
-                text, _, status = await self._request(
-                    "POST",
-                    f"{BASE_URL}/club/reservations/formule/ajax",
-                    headers={
-                        **_JSON_HEADERS,
-                        "Content-Type": "application/json",
-                        "Origin": BASE_URL,
-                        "Referer": urljoin(BASE_URL, book_path),
-                        "X-Requested-With": "XMLHttpRequest",
-                    },
-                    data=json.dumps(payload, ensure_ascii=False),
-                )
-            except TenupError as err:
-                report["json_attempts"].append({"variante": label, "error": str(err)})
-                continue
-            report["json_attempts"].append(
-                {"variante": label, "status": status, "body": _sample(text)}
-            )
 
         report["js"] = []
         report["js_scanned"] = []

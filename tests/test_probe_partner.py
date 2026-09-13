@@ -137,35 +137,3 @@ def test_partner_post_variants_is_empty_without_an_identifier():
     from custom_components.tenup.api import partner_post_variants
 
     assert partner_post_variants({"a": "b"}, "J. DOE") == []
-
-
-def test_json_payload_variants_starts_without_the_partner():
-    from custom_components.tenup.api import json_payload_variants
-
-    base = {"codeClub": "87654321", "ticketAutorises": True}
-    out = json_payload_variants(base, "John DOE (111111111)")
-    assert [label for label, _ in out] == ["sans partenaire", "joueur2_nom", "idPartenaire"]
-    assert "joueur2_nom" not in out[0][1] and "idPartenaire" not in out[0][1]
-    assert out[1][1]["joueur2_nom"] == "John DOE (111111111)"
-    assert out[2][1]["idPartenaire"] == "111111111"
-    # JSON garde les types natifs, contrairement au form-encode
-    assert out[0][1]["ticketAutorises"] is True
-    assert base == {"codeClub": "87654321", "ticketAutorises": True}
-
-
-def test_json_payload_variants_without_a_usable_partner_keeps_the_bare_body():
-    from custom_components.tenup.api import json_payload_variants
-
-    assert [l for l, _ in json_payload_variants({"a": 1}, None)] == ["sans partenaire"]
-    assert [l for l, _ in json_payload_variants({"a": 1}, "J. DOE")] == ["sans partenaire"]
-
-
-def test_json_payload_variants_never_aliases_the_base():
-    from custom_components.tenup.api import json_payload_variants
-
-    # Chaque corps doit etre independant: sinon un appelant qui ecrit dans le
-    # premier payload modifierait la base sans le savoir.
-    base = {"codeClub": "87654321"}
-    for _label, payload in json_payload_variants(base, "John DOE (111111111)"):
-        payload["injecte"] = 1
-    assert base == {"codeClub": "87654321"}
