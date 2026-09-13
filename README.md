@@ -32,9 +32,11 @@ The integration reads the member reservation grid of your club (`Réserver dans 
 
 ## Installation
 
-1. HACS > Integrations > three dots > Custom repositories > add `https://github.com/ADNPolymerase/ha-tenup-resa` (category Integration).
-2. Install **Ten'Up**, restart Home Assistant.
+1. HACS > three dots > Custom repositories > `https://github.com/ADNPolymerase/ha-tenup-resa`, type Integration.
+2. Search for `tenup` in HACS, download **Ten'Up**, restart Home Assistant.
 3. Settings > Devices and services > Add integration > **Ten'Up**.
+
+A repository you just added is listed as New and can be hidden by the status filter: search for it.
 
 ## Configuration
 

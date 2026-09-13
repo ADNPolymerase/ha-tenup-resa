@@ -32,9 +32,11 @@ L'intégration lit le tableau de réservation des adhérents (« Réserver dans 
 
 ## Installation
 
-1. HACS > Intégrations > trois points > Dépôts personnalisés > ajouter `https://github.com/ADNPolymerase/ha-tenup-resa` (catégorie Intégration).
-2. Installer **Ten'Up**, redémarrer Home Assistant.
+1. HACS > trois points > Dépôts personnalisés > `https://github.com/ADNPolymerase/ha-tenup-resa`, type Intégration.
+2. Chercher `tenup` dans HACS, télécharger **Ten'Up**, redémarrer Home Assistant.
 3. Paramètres > Appareils et services > Ajouter une intégration > **Ten'Up**.
+
+Un dépôt tout juste ajouté apparaît comme « Nouveau » et peut être masqué par le filtre de statut : cherchez-le.
 
 ## Configuration
 
