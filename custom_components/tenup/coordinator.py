@@ -243,7 +243,14 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         return choice, str(formulas[0].get("value") or "")
 
     async def async_cancel(self, slot: Slot) -> None:
-        await self.client.async_cancel(slot)
+        try:
+            await self.client.async_cancel(slot)
+        except (TenupBookingError, TenupConnectionError):
+            # A cancellation may have gone through whatever the answer said:
+            # reconcile the grid now instead of in up to fifteen minutes. An auth
+            # error is left out on purpose: the refresh would only count it twice.
+            await self.async_request_refresh()
+            raise
         self._apply_locally(slot.mark_free)
         await self.async_request_refresh()
 

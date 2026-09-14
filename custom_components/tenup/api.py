@@ -14,7 +14,7 @@ from urllib.parse import quote, urlencode, urljoin, urlsplit
 import aiohttp
 from yarl import URL
 
-from .const import BASE_URL, PUBLIC_API, QUEUE_ENQUEUE_URL, QUEUE_HOST, USER_AGENT
+from .const import BASE_URL, PUBLIC_API, QUEUE_ENQUEUE_URL, QUEUE_HOST, SLOT_MINE, USER_AGENT
 from .parser import (
     BookingForm,
     Planning,
@@ -488,14 +488,37 @@ class TenupClient:
         )
 
     async def async_cancel(self, slot: Slot) -> None:
-        """Cancel one of the account owner's reservations (a plain GET on Ten'Up)."""
+        """Cancel one of the account owner's reservations (a plain GET on Ten'Up).
+
+        The page Ten'Up answers a cancellation with is not a signed-in Drupal
+        page. Measured on 2026-09-14 it carried no body class at all, so going
+        through _get_html reported a failure while the booking was already gone,
+        and the user clicked a second time. That page cannot tell success from
+        failure; the planning of the day can, so the result is judged there.
+        """
         if not slot.cancel_path:
             raise TenupBookingError("This slot has no cancellation link (not yours)")
-        body, final_url = await self._get_html(slot.cancel_path)
+        body, _, status = await self._request(
+            "GET", urljoin(BASE_URL, slot.cancel_path), headers=_HTML_HEADERS
+        )
+        if status >= 500:
+            raise TenupConnectionError(f"Ten'Up answered {status} on {slot.cancel_path}")
+        if looks_signed_out(body):
+            raise TenupAuthError("Ten'Up session is not logged in (cookie expired?)")
         messages = parse_messages(body)
         errors = [m for m in messages if "impossible" in m.lower() or "erreur" in m.lower()]
         if errors:
             raise TenupBookingError(" ".join(errors))
+        day = slot.start.astimezone(self._tzinfo).date()
+        try:
+            planning = await self.async_get_planning(day)
+        except TenupConnectionError as err:
+            raise TenupConnectionError(
+                f"annulation envoyée mais non confirmée, vérifiez le planning ({err})"
+            ) from err
+        still = planning.find(slot.court_id, slot.start)
+        if still is not None and still.state == SLOT_MINE:
+            raise TenupBookingError("Ten'Up a conservé la réservation, elle n'est pas annulée")
 
     # --------------------------------------------------------------- public API
     @staticmethod

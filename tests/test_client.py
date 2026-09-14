@@ -7,7 +7,7 @@ import aiohttp
 import pytest
 from yarl import URL
 
-from custom_components.tenup.api import TenupAuthError, TenupClient, TenupConnectionError
+from custom_components.tenup.api import TenupAuthError, TenupBookingError, TenupClient, TenupConnectionError
 
 FIXTURES = Path(__file__).parent / "fixtures"
 TZ = timezone(timedelta(hours=2))
@@ -257,3 +257,96 @@ def test_session_cookie_falls_back_to_ssess_without_a_shared_cookie():
         client = TenupClient(session, f"{REAL_NAME}=legacy", "87654321", TZ)
         return client.session_cookie
     assert run(main) == f"{REAL_NAME}=legacy"
+
+
+# ---------------------------------------------------------------- cancellation
+CANCEL_PATH = "/club/reservation_court_delete/nojs/87654321/165841846/21100/2100"
+PLANNING_URL = "https://tenup.fft.fr/club/87654321/reservations/20260910"
+# What Ten'Up answered a successful cancellation with on 2026-09-14: no body
+# class at all, so nothing that says signed in or signed out.
+NOT_A_DRUPAL_PAGE = "<!doctype html><html><head></head><div>ok</div></html>"
+FREED = PLANNING.replace("adherent-reservation-calendrier-row-mine", "")
+
+
+def _my_slot():
+    from custom_components.tenup.parser import parse_planning
+
+    planning = parse_planning(PLANNING, date(2026, 9, 10), TZ)
+    return next(s for s in planning.slots if s.cancel_path)
+
+
+def _cancel_calls(session):
+    return [c for c in session.calls if "/reservation_court_delete/" in c[1]]
+
+
+def test_a_cancellation_is_judged_on_the_planning_not_on_the_answer_page():
+    """The answer page proved nothing and made a real cancellation look failed."""
+    async def main():
+        session = FakeSession({
+            ("GET", "/reservation_court_delete/"): [
+                FakeResponse(NOT_A_DRUPAL_PAGE, "https://tenup.fft.fr" + CANCEL_PATH)],
+            ("GET", "/reservations/20260910"): [FakeResponse(FREED, PLANNING_URL)],
+        })
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_cancel(_my_slot())
+        return session
+
+    session = run(main)
+    assert len(_cancel_calls(session)) == 1, "the cancel link is opened once, never retried"
+
+
+def test_a_cancellation_the_planning_does_not_confirm_is_an_error():
+    async def main():
+        session = FakeSession({
+            ("GET", "/reservation_court_delete/"): [
+                FakeResponse(NOT_A_DRUPAL_PAGE, "https://tenup.fft.fr" + CANCEL_PATH)],
+            ("GET", "/reservations/20260910"): [FakeResponse(PLANNING, PLANNING_URL)],
+        })
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_cancel(_my_slot())
+
+    with pytest.raises(TenupBookingError):
+        run(main)
+
+
+def test_a_cancellation_on_a_dead_session_still_asks_for_a_cookie():
+    """And the planning is not fetched: there is nothing to confirm."""
+    async def main():
+        body = '<!doctype html><html><body class="html not-logged-in">Connexion</body></html>'
+        session = FakeSession({("GET", "/reservation_court_delete/"): [
+            FakeResponse(body, "https://tenup.fft.fr" + CANCEL_PATH)]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_cancel(_my_slot())
+
+    with pytest.raises(TenupAuthError):
+        run(main)
+
+
+def test_a_refusal_stated_by_tenup_is_relayed():
+    async def main():
+        body = ('<!doctype html><html><body class="html logged-in">'
+                '<div class="messages error">Annulation impossible hors delai</div></body></html>')
+        session = FakeSession({("GET", "/reservation_court_delete/"): [
+            FakeResponse(body, "https://tenup.fft.fr" + CANCEL_PATH)]})
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_cancel(_my_slot())
+
+    with pytest.raises(TenupBookingError) as excinfo:
+        run(main)
+    assert "impossible" in str(excinfo.value)
+
+
+def test_an_unconfirmed_cancellation_says_so():
+    """The link was opened: the user must not be told Ten'Up is simply down."""
+    async def main():
+        session = FakeSession({
+            ("GET", "/reservation_court_delete/"): [
+                FakeResponse(NOT_A_DRUPAL_PAGE, "https://tenup.fft.fr" + CANCEL_PATH)],
+            ("GET", "/reservations/20260910"): [FakeResponse(QUEUE_BODY, PLANNING_URL)],
+        })
+        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
+        await client.async_cancel(_my_slot())
+
+    with pytest.raises(TenupConnectionError) as excinfo:
+        run(main)
+    assert "non confirmée" in str(excinfo.value)

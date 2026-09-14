@@ -1,6 +1,10 @@
 """The coordinator must keep the stored cookie in step with the live session."""
+import asyncio
 from types import SimpleNamespace
 
+import pytest
+
+from custom_components.tenup.api import TenupAuthError, TenupBookingError, TenupConnectionError
 from custom_components.tenup.const import CONF_COOKIE
 from custom_components.tenup.coordinator import TenupCoordinator
 
@@ -72,3 +76,49 @@ def test_upgrading_from_ssess_to_the_shared_cookie_is_saved():
     coordinator, saved = make(f"{NAME}=old", SHARED)
     coordinator._persist_rotated_cookie()
     assert saved[0]["data"][CONF_COOKIE] == SHARED
+
+
+# ---------------------------------------------------------------- cancellation
+def make_cancel(error=None):
+    """A bare coordinator for async_cancel: a client that succeeds or raises."""
+    coordinator = TenupCoordinator.__new__(TenupCoordinator)
+    refreshes = []
+
+    async def cancel(slot):
+        if error is not None:
+            raise error
+
+    async def refresh():
+        refreshes.append(True)
+
+    coordinator.client = SimpleNamespace(async_cancel=cancel)
+    coordinator.data = None
+    coordinator.async_request_refresh = refresh
+    slot = SimpleNamespace(freed=False)
+    slot.mark_free = lambda: setattr(slot, "freed", True)
+    return coordinator, slot, refreshes
+
+
+def test_a_confirmed_cancellation_frees_the_cell_and_refreshes():
+    coordinator, slot, refreshes = make_cancel()
+    asyncio.run(coordinator.async_cancel(slot))
+    assert slot.freed
+    assert refreshes == [True]
+
+
+@pytest.mark.parametrize("error", [TenupConnectionError("x"), TenupBookingError("x")])
+def test_a_failed_cancellation_still_reconciles_the_grid(error):
+    """It may have gone through anyway: do not leave the card wrong for 15 minutes."""
+    coordinator, slot, refreshes = make_cancel(error)
+    with pytest.raises(type(error)):
+        asyncio.run(coordinator.async_cancel(slot))
+    assert not slot.freed, "a cell is freed only on a confirmed cancellation"
+    assert refreshes == [True]
+
+
+def test_an_auth_error_does_not_trigger_a_refresh():
+    """The refresh would hit the same dead cookie and count the failure twice."""
+    coordinator, slot, refreshes = make_cancel(TenupAuthError("x"))
+    with pytest.raises(TenupAuthError):
+        asyncio.run(coordinator.async_cancel(slot))
+    assert refreshes == []
