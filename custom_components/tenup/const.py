@@ -18,6 +18,10 @@ CONF_DAYS_AHEAD = "days_ahead"
 CONF_FRIENDS = "friends"
 CONF_SCAN_INTERVAL = "scan_interval"
 
+# Key of the per-entry auth failure count kept in hass.data[DOMAIN][entry_id],
+# so it outlives the coordinator that a failed setup throws away and rebuilds.
+AUTH_FAILURES = "auth_failures"
+
 DEFAULT_DAYS_AHEAD = 7
 DEFAULT_SCAN_INTERVAL = timedelta(minutes=15)
 MIN_SCAN_INTERVAL_MINUTES = 5

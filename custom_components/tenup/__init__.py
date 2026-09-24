@@ -40,18 +40,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> boo
         dt_util.get_default_time_zone(),
     )
     coordinator = TenupCoordinator(hass, entry, client)
+    # Every way out of this block closes the session. A setup that fails is
+    # retried every few minutes, and the first refresh raises ConfigEntryNotReady
+    # or ConfigEntryAuthFailed far more often than it raises our own errors, so
+    # closing only on those leaked one aiohttp session per attempt, for ever.
     try:
         await coordinator.async_config_entry_first_refresh()
-    except ConfigEntryAuthFailed:
-        raise
-    except (TenupAuthError,) as err:
+        entry.runtime_data = coordinator
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except TenupAuthError as err:
+        await session.close()
         raise ConfigEntryAuthFailed(str(err)) from err
     except TenupConnectionError as err:
         await session.close()
         raise ConfigEntryNotReady(str(err)) from err
+    except BaseException:
+        await session.close()
+        raise
 
-    entry.runtime_data = coordinator
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
@@ -71,3 +77,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> bo
     if unloaded:
         await entry.runtime_data.client.session.close()
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: TenupConfigEntry) -> None:
+    """Forget the auth failure count of an entry that is being removed."""
+    hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)

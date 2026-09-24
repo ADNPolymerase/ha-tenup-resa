@@ -21,6 +21,7 @@ from .api import (
     parse_partner_choice,
 )
 from .const import (
+    AUTH_FAILURES,
     MAX_PLAYER_LOOKUPS,
     CONF_COOKIE,
     CONF_DAYS_AHEAD,
@@ -40,6 +41,15 @@ from .parser import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def auth_state(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, int]:
+    """Per-entry counters that must outlive the coordinator holding them.
+
+    A setup that fails is retried with a brand new coordinator, so anything kept
+    on the coordinator itself restarts at zero every few minutes.
+    """
+    return hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
 
 
 @dataclass(slots=True)
@@ -104,9 +114,23 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         self._players_cache: dict[str, int] = {}
         self._store: Store = Store(hass, 1, f"{DOMAIN}_players_{entry.entry_id}")
         self._cache_loaded = False
-        self._auth_failures = 0
         self.friends: list[str] = list(entry.options.get(CONF_FRIENDS) or [])
         self._options_signature = {k: v for k, v in entry.options.items() if k != CONF_FRIENDS}
+
+    @property
+    def _auth_failures(self) -> int:
+        """How many times in a row Ten'Up has said the session is signed out.
+
+        Read from hass.data rather than kept here: a failed setup builds a new
+        coordinator on every retry, so a counter living on the coordinator would
+        restart at zero and the second refusal, the one that asks for a new
+        cookie, would never come.
+        """
+        return auth_state(self.hass, self.entry).get(AUTH_FAILURES, 0)
+
+    @_auth_failures.setter
+    def _auth_failures(self, value: int) -> None:
+        auth_state(self.hass, self.entry)[AUTH_FAILURES] = value
 
     @property
     def days_ahead(self) -> int:
@@ -138,7 +162,9 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
                 planning = await self.client.async_get_planning(day)
             except TenupAuthError as err:
                 # One refusal is not proof: ask the user for a new cookie only
-                # once Ten'Up has said it twice in a row.
+                # once Ten'Up has said it twice in a row. The count spans setup
+                # retries, so an expired cookie reaches the second refusal
+                # instead of retrying for ever.
                 self._auth_failures += 1
                 if self._auth_failures < 2:
                     raise UpdateFailed(f"{err} (retrying before asking to sign in again)") from err

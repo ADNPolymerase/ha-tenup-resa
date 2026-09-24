@@ -4,8 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import UpdateFailed
+
 from custom_components.tenup.api import TenupAuthError, TenupBookingError, TenupConnectionError
-from custom_components.tenup.const import CONF_COOKIE
+from custom_components.tenup.const import AUTH_FAILURES, CONF_COOKIE, DOMAIN
 from custom_components.tenup.coordinator import TenupCoordinator
 
 NAME = "SSESS7ba44afc36c80c3faa2b8fa87e7742c5"
@@ -122,3 +125,83 @@ def test_an_auth_error_does_not_trigger_a_refresh():
     with pytest.raises(TenupAuthError):
         asyncio.run(coordinator.async_cancel(slot))
     assert refreshes == []
+
+
+# --------------------------------------------- asking for a new cookie, at last
+def make_refresh(errors, hass_data=None):
+    """A bare coordinator for _async_update_data: one fake day, scripted errors.
+
+    ``hass_data`` is the real hass.data, shared on purpose so a test can hand it
+    to a second coordinator the way a setup retry does.
+    """
+    coordinator = TenupCoordinator.__new__(TenupCoordinator)
+    calls = []
+    queue = list(errors)
+
+    async def async_get_planning(day):
+        calls.append(day)
+        error = queue.pop(0) if queue else None
+        if error is not None:
+            raise error
+        return SimpleNamespace(slots=[], courts=[], window_end=None)
+
+    coordinator.client = SimpleNamespace(
+        async_get_planning=async_get_planning, session_cookie=f"{NAME}=live"
+    )
+    coordinator.entry = SimpleNamespace(
+        data={CONF_COOKIE: f"{NAME}=live", "club_code": "87654321"},
+        options={"days_ahead": 1},
+        entry_id="01ABCDEF",
+    )
+    coordinator.hass = SimpleNamespace(data={} if hass_data is None else hass_data)
+    coordinator._cache_loaded = True
+    coordinator._players_cache = {}
+    return coordinator, calls
+
+
+def test_one_refusal_only_fails_the_refresh():
+    """A single odd answer is not proof: do not send the user hunting a cookie."""
+    coordinator, _calls = make_refresh([TenupAuthError("signed out")])
+    with pytest.raises(UpdateFailed):
+        asyncio.run(coordinator._async_update_data())
+
+
+def test_a_second_refusal_asks_for_a_new_cookie():
+    data = {}
+    first, _ = make_refresh([TenupAuthError("signed out")], data)
+    with pytest.raises(UpdateFailed):
+        asyncio.run(first._async_update_data())
+    second, _ = make_refresh([TenupAuthError("signed out")], data)
+    with pytest.raises(ConfigEntryAuthFailed):
+        asyncio.run(second._async_update_data())
+
+
+def test_the_count_survives_the_coordinator_a_setup_retry_throws_away():
+    """The regression: an expired cookie retried for forty hours without ever
+    offering to re-authenticate, because each retry started counting again."""
+    data = {}
+    for _ in range(5):
+        coordinator, _ = make_refresh([TenupAuthError("signed out")], data)
+        try:
+            asyncio.run(coordinator._async_update_data())
+        except (UpdateFailed, ConfigEntryAuthFailed):
+            pass
+    assert data[DOMAIN]["01ABCDEF"][AUTH_FAILURES] >= 2
+
+
+def test_a_successful_day_clears_the_count():
+    """A cookie that works again must not be one refusal away from a reauth."""
+    data = {DOMAIN: {"01ABCDEF": {AUTH_FAILURES: 1}}}
+    coordinator, _ = make_refresh([None], data)
+    asyncio.run(coordinator._async_update_data())
+    assert data[DOMAIN]["01ABCDEF"][AUTH_FAILURES] == 0
+
+
+def test_a_connection_error_never_counts_as_a_refusal():
+    """A Queue-it waiting room or a bot challenge is not an expired cookie."""
+    data = {}
+    for _ in range(5):
+        coordinator, _ = make_refresh([TenupConnectionError("queue-it")], data)
+        with pytest.raises(UpdateFailed):
+            asyncio.run(coordinator._async_update_data())
+    assert data.get(DOMAIN, {}).get("01ABCDEF", {}).get(AUTH_FAILURES, 0) == 0
