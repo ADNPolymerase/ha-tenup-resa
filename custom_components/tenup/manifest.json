@@ -1,6 +1,9 @@
 {
   "domain": "tenup",
   "name": "Ten'Up",
+  "after_dependencies": [
+    "lovelace"
+  ],
   "codeowners": [
     "@ADNPolymerase"
   ],
@@ -13,5 +16,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/ADNPolymerase/ha-tenup-resa/issues",
   "requirements": [],
-  "version": "1.0.1"
+  "version": "1.1.0"
 }

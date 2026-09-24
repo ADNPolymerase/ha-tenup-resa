@@ -7,11 +7,13 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.loader import async_get_integration
 from homeassistant.util import dt as dt_util
 
 from .api import TenupAuthError, TenupClient, TenupConnectionError, new_session
 from .const import CONF_CLUB_CODE, CONF_COOKIE, DOMAIN
 from .coordinator import TenupCoordinator
+from .frontend import async_register_card
 from .http import async_setup_bookmarklet_page
 from .services import async_setup_services
 from .websocket import async_setup_websocket
@@ -23,10 +25,12 @@ type TenupConfigEntry = ConfigEntry[TenupCoordinator]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Register services, websocket commands and the bookmarklet page once."""
+    """Register services, websocket commands, the bookmarklet page and the card."""
     async_setup_services(hass)
     async_setup_websocket(hass)
     async_setup_bookmarklet_page(hass)
+    integration = await async_get_integration(hass, DOMAIN)
+    await async_register_card(hass, str(integration.version or "0"))
     return True
 
 

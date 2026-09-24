@@ -1,2 +1,11 @@
-custom_components/oklyn/*.py linguist-vendored=false
-custom_components/oklyn/*.py linguist-detectable=true
+* text=auto
+*.js text eol=lf
+
+# The path said custom_components/oklyn until 1.1.0, so none of these rules
+# actually applied and GitHub was guessing the language of this repository.
+custom_components/tenup/*.py linguist-vendored=false
+custom_components/tenup/*.py linguist-detectable=true
+
+custom_components/tenup/ha-tenup-card.js linguist-vendored=false
+custom_components/tenup/ha-tenup-card.js linguist-generated=false
+custom_components/tenup/ha-tenup-card.js linguist-detectable=true

@@ -6,6 +6,7 @@
 [![GitHub Release](https://badgen.net/github/release/ADNPolymerase/ha-tenup-resa)](https://github.com/ADNPolymerase/ha-tenup-resa/releases)
 [![Hassfest](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml)
 [![HACS Action](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hacs.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hacs.yml)
+[![Tests](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/tests.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow.svg?logo=buy-me-a-coffee)](https://buymeacoffee.com/adnpolymerase)
 
@@ -21,7 +22,8 @@ See the free courts of your tennis club on [Ten'Up](https://tenup.fft.fr) (Frenc
 - **Sensors**: free slots today, free slots over the coming days, next free slot, next reservation, number of reservations.
 - **Calendar**: your reservations at the club.
 - **Services**: `tenup.book` and `tenup.cancel`.
-- **Websocket command** `tenup/planning` with the full grid (courts x slots x days) for a companion card.
+- **A Lovelace card**, shipped with the integration: the club grid, book and cancel in one tap.
+- **Websocket command** `tenup/planning` with the full grid (courts x slots x days).
 
 The integration reads the member reservation grid of your club (`Réserver dans mon club`), not the paid hourly rental.
 
@@ -37,6 +39,10 @@ The integration reads the member reservation grid of your club (`Réserver dans 
 3. Settings > Devices and services > Add integration > **Ten'Up**.
 
 A repository you just added is listed as New and can be hidden by the status filter: search for it.
+
+The card comes with it: there is nothing else to download and no Lovelace resource to add by hand.
+
+> **Upgrading from 1.0.x?** The card used to live in its own repository. Remove **Ten'Up Card** from HACS: the integration serves its own copy and drops the old dashboard resource on the next restart. Your cards keep working, the configuration does not change.
 
 ## Configuration
 
@@ -59,6 +65,43 @@ A repository you just added is listed as New and can be hidden by the status fil
 When the session expires, Home Assistant raises a repair asking for a fresh cookie. No password is ever stored.
 
 Options: number of days to fetch (default 7, the club horizon) and refresh interval (default 15 minutes).
+
+## The card
+
+Add **Ten'Up Card** from the card picker, or:
+
+```yaml
+type: custom:ha-tenup-card
+days: 3
+```
+
+- **The club grid**: one tab per day, courts in columns, slots at their real size.
+- **Colours**: green free, yellow 2 players needed, red taken, purple a friend, blue yours, grey past.
+- **Book and cancel** in one tap, after a confirmation.
+- **2-player courts**: search your partner and book from the card. No member number to look up.
+- **Visual editor**, English and French.
+
+| Option | Default | |
+|---|---|---|
+| `name` | club name | Title |
+| `entry_id` | first club | Club to show |
+| `days` | `3` | Day tabs, 1 to 7 |
+| `start_hour`, `end_hour` | club grid | Hours shown |
+| `courts` | all | Courts shown |
+| `show_names` | `true` | Show who booked. Off: no names, no following from the grid |
+| `confirm` | `true` | Ask before booking or cancelling |
+| `compact` | `false` | Smaller cells |
+| `language` | `auto` | `auto`, `en` or `fr` |
+
+Cancelling is immediate on Ten'Up: keep `confirm` on.
+
+### Friends
+
+Their bookings turn purple. Tap a booking to follow a player by initial (just them) or with **Every NAME** (family and namesakes), or manage the list from the header button.
+
+A partner you book with can be remembered from the booking dialog, and is then offered in one tap next time.
+
+Ten'Up only shows the first-name initial in the grid, so two players sharing it and a surname are coloured alike. Booking is not affected: the partner you pick is identified exactly.
 
 ## Services
 

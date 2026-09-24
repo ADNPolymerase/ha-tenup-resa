@@ -1,0 +1,32 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install
+        run: pip install pytest homeassistant
+      - name: Behaviour tests
+        run: pytest -q tests/
+
+  card:
+    name: Card behaviour tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: node --check custom_components/tenup/ha-tenup-card.js
+      - name: Behaviour tests
+        run: node tests/card/run.mjs
