@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.0
+
+### The entry reloads itself, once
+
+Reauthenticating or reconfiguring used to reload the entry twice: once from the
+config flow, once from the integration's own update listener. Home Assistant
+logs that as a deprecation and will raise on it from 2026.12
+([core#169198](https://github.com/home-assistant/core/pull/169198)).
+
+The flow now uses the non-reloading variant and the listener owns every reload,
+which it has to: it is also what takes a new friend from the card without
+refetching the whole horizon, and what absorbs a cookie Ten'Up rotates on its
+own. A cookie the integration did not write itself is the mark of a reauth or a
+reconfigure, and that one does get a reload.
+
+**This raises the minimum to Home Assistant 2025.3**, which is where
+`async_update_and_abort` was added.
+
+### Verification
+
+134 integration tests (127 before), covering both halves of the contract: the
+flow schedules no reload of its own, and the listener reloads what it cannot
+absorb. Mutants of each killed.
+
 ## 1.1.0
 
 ### The card ships with the integration

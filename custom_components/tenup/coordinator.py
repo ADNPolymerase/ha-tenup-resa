@@ -136,14 +136,20 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
     def days_ahead(self) -> int:
         return int(self.entry.options.get(CONF_DAYS_AHEAD, DEFAULT_DAYS_AHEAD))
 
-    def absorb_friends(self, entry: ConfigEntry) -> bool:
-        """Take a new friends list without reloading, if that is the only change.
+    def absorb_update(self, entry: ConfigEntry) -> bool:
+        """Take a change in place; False asks the caller for a reload.
 
-        Adding a friend from the card must not cost a full refetch of every day.
+        Two writes must not cost a full refetch of every day of the horizon: the
+        card adding a friend, and the coordinator saving a cookie Ten'Up has
+        rotated. Everything else needs a reload, and a cookie the coordinator did
+        not write is exactly that: it comes from a reauth or a reconfigure, and
+        only a reload puts it in the client.
         """
         options = dict(entry.options)
         friends = list(options.pop(CONF_FRIENDS, []) or [])
         if options != self._options_signature:
+            return False
+        if entry.data.get(CONF_COOKIE) != self.client.session_cookie:
             return False
         self.friends = friends
         return True

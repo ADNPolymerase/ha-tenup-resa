@@ -30,7 +30,7 @@ The integration reads the member reservation grid of your club (`Réserver dans 
 ## Requirements
 
 - A Ten'Up account that is a member of the club (a licence with a booking formula).
-- Home Assistant 2024.12 or newer.
+- Home Assistant 2025.3 or newer.
 
 ## Installation
 

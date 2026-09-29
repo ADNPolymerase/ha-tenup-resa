@@ -30,7 +30,7 @@ L'intégration lit le tableau de réservation des adhérents (« Réserver dans 
 ## Prérequis
 
 - Un compte Ten'Up adhérent du club (licence avec une formule de réservation).
-- Home Assistant 2024.12 ou plus récent.
+- Home Assistant 2025.3 ou plus récent.
 
 ## Installation
 

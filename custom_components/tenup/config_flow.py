@@ -215,7 +215,10 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             if error:
                 errors["base"] = error
             else:
-                return self.async_update_reload_and_abort(
+                # Not the reloading variant: the entry has an update listener,
+                # and letting Home Assistant reload too would race with it.
+                # Combining both raises an error from Home Assistant 2026.12.
+                return self.async_update_and_abort(
                     entry, data_updates={CONF_COOKIE: cookie}
                 )
         return self.async_show_form(
@@ -240,7 +243,8 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = error
             else:
                 entry = self._get_reauth_entry()
-                return self.async_update_reload_and_abort(entry, data_updates={CONF_COOKIE: cookie})
+                # See the reconfigure step: the update listener owns the reload.
+                return self.async_update_and_abort(entry, data_updates={CONF_COOKIE: cookie})
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=STEP_COOKIE_SCHEMA,
