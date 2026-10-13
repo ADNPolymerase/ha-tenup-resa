@@ -39,6 +39,7 @@ from .api import (
     parse_cookie_header,
 )
 from .const import (
+    AUTH_FAILURES,
     CONF_CLUB_CODE,
     CONF_CLUB_NAME,
     CONF_COOKIE,
@@ -50,6 +51,7 @@ from .const import (
     DOMAIN,
     MIN_SCAN_INTERVAL_MINUTES,
 )
+from .coordinator import auth_state
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -158,6 +160,19 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         }
 
+    def _accept_new_session(self, entry: ConfigEntry) -> None:
+        """Hand a freshly pasted session a clean slate, then wake the entry.
+
+        The refusal count is what makes the integration ask for a new cookie
+        only once Ten'Up has said no twice in a row, and it deliberately
+        outlives the coordinator. It must not outlive the cookie it was counted
+        against: a session just validated by this flow starts at zero, or a
+        single hiccup on the first refresh would send the user straight back
+        here, which is exactly what counting to two is meant to avoid.
+        """
+        auth_state(self.hass, entry).pop(AUTH_FAILURES, None)
+        self._schedule_reload_if_dormant(entry)
+
     def _schedule_reload_if_dormant(self, entry: ConfigEntry) -> None:
         """Wake an entry that failed to set up, once it has a working session.
 
@@ -221,7 +236,7 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Not the reloading variant: a loaded entry has an update
                 # listener, and letting Home Assistant reload too would race
                 # with it. Combining both raises an error from HA 2026.12.
-                self._schedule_reload_if_dormant(entry)
+                self._accept_new_session(entry)
                 return self.async_update_and_abort(
                     entry, data_updates={CONF_COOKIE: cookie}
                 )
@@ -248,7 +263,7 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 entry = self._get_reauth_entry()
                 # See the reconfigure step: the update listener owns the reload.
-                self._schedule_reload_if_dormant(entry)
+                self._accept_new_session(entry)
                 return self.async_update_and_abort(entry, data_updates={CONF_COOKIE: cookie})
         return self.async_show_form(
             step_id="reauth_confirm",

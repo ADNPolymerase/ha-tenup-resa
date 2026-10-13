@@ -140,5 +140,23 @@ def test_a_loaded_entry_is_left_to_its_listener():
 
 def test_both_ways_out_of_the_flow_go_through_the_guard():
     """A reauth and a reconfigure both land on an entry that may be dormant."""
-    assert FLOW.count("_schedule_reload_if_dormant(entry)") == 2
+    assert FLOW.count("_accept_new_session(entry)") == 2
     assert "async_update_reload_and_abort" not in FLOW
+
+
+def test_a_new_session_starts_with_a_clean_refusal_count():
+    """Counting to two is what keeps one hiccup from asking for a new cookie.
+
+    The count outlives the coordinator on purpose, so without this a session
+    just validated would inherit the refusals of the dead one and be sent back
+    to the dialog on its first stumble.
+    """
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.tenup.const import AUTH_FAILURES, DOMAIN
+
+    flow, entry, reloaded = _flow_with(ConfigEntryState.SETUP_ERROR)
+    flow.hass.data = {DOMAIN: {entry.entry_id: {AUTH_FAILURES: 2}}}
+    flow._accept_new_session(entry)
+    assert flow.hass.data[DOMAIN][entry.entry_id].get(AUTH_FAILURES) is None
+    assert reloaded == ["abcd"], "and the entry is still woken"

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.5
+
+### A pasted session no longer inherits the refusals of the dead one
+
+The integration asks for a new cookie only once Ten'Up has refused twice in a
+row, so that a single hiccup never costs the user a trip to the dialog. That
+count deliberately outlives the coordinator, which rebuilds on every setup
+retry, but it also outlived the cookie it was counted against: a session just
+validated started at two, and the first stumble sent the user straight back to
+where they came from.
+
+Validating a session now clears the count, which is sound because the flow has
+just proved that session works.
+
 ## 2.0.4
 
 ### The dialog now shows which row to copy
