@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.6
+
+### The "Copy as cURL" shortcut is no longer suggested
+
+It was offered as the easier of the two ways to hand over a session. It is not:
+the Network tab lists every request a page makes, most of them to other sites
+that carry nothing useful, so picking a row means knowing which one. That is
+harder than reading a row in a table, not easier.
+
+The dialogs and both READMEs now describe one way only, the Cookies view, with
+the picture of the row to copy. Pasting a cURL still works for anyone who
+prefers it; it is simply no longer presented as the simple path.
+
 ## 2.0.5
 
 ### A pasted session no longer inherits the refusals of the dead one

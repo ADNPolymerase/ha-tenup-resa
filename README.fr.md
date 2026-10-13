@@ -52,11 +52,7 @@ La carte vient avec : rien d'autre à télécharger, aucune ressource Lovelace �
 
    <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.fr.png" alt="La ligne du cookie de session dans les cookies" width="760">
 
-   **Encore plus simple si vous préférez :** onglet **Réseau**, clic droit sur n'importe quelle requête, **Copier > Copier comme cURL**, et collez le tout dans le champ : la session y est retrouvée toute seule.
-
    Ce cookie est `HttpOnly` depuis la refonte d'octobre 2026 : aucun script de page ne peut le lire, et le marque-page des versions précédentes ne fonctionne plus.
-
-   Au choix aussi : onglet Réseau > clic droit sur une ligne > Copier > **Copier en tant que cURL**, et collez le tout. L'intégration ne retient que le cookie utile : adresses, en-têtes et autres cookies sont ignorés et ne sont jamais enregistrés.
 
 Quand la session expire, Home Assistant affiche une réparation qui demande un cookie frais. Aucun mot de passe n'est jamais stocké.
 

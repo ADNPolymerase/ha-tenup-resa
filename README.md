@@ -52,11 +52,7 @@ The card comes with it: there is nothing else to download and no Lovelace resour
 
    <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png" alt="The session cookie row in the cookies" width="760">
 
-   **Easier, if you prefer:** **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing into the field: the session is picked out of it on its own.
-
    This cookie is `HttpOnly` since the October 2026 rebuild: no page script can read it, and the bookmarklet of earlier versions no longer works.
-
-   Or: Network tab > right-click a row > Copy > **Copy as cURL**, and paste the whole thing. The integration keeps only the useful cookie: URLs, headers and other cookies are ignored and never stored.
 
 When the session expires, Home Assistant raises a repair asking for a fresh cookie. No password is ever stored.
 
