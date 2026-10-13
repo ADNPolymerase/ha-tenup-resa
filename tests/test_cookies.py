@@ -44,7 +44,7 @@ def test_cookie_candidates_accepts_a_copy_as_curl_paste():
     """One right-click in the Network tab must be enough: no cookie hunting."""
     from custom_components.tenup.api import cookie_candidates
 
-    assert cookie_candidates(CURL_PASTE) == [
+    assert cookie_candidates(CURL_PASTE)[:1] == [
         "SSESS7ba44afc36c80c3faa2b8fa87e7742c5=aBcD-eF_1234"
     ]
 
@@ -105,7 +105,8 @@ def test_the_session_cookie_is_pulled_out_of_a_copy_as_curl():
     """The one the site authenticates with, among everything a browser carries."""
     from custom_components.tenup.api import cookie_candidates
 
-    assert cookie_candidates(f"-b 'datadome=x; {SESSION}; userStore=%7B%7D'") == [SESSION]
+    got = cookie_candidates(f"-b 'datadome=x; {SESSION}; userStore=%7B%7D'")
+    assert got[0] == SESSION
 
 
 def test_the_session_cookie_comes_before_the_one_it_replaced():
@@ -122,8 +123,28 @@ def test_the_session_cookie_comes_before_the_one_it_replaced():
 def test_the_old_cookies_are_still_read_on_their_own():
     from custom_components.tenup.api import cookie_candidates
 
-    assert cookie_candidates(f"-b 'datadome=x; {SHARED}; _ga=1'") == [SHARED]
-    assert cookie_candidates(f"-b '{SSESS}; {SHARED}'") == [SHARED, SSESS]
+    assert cookie_candidates(f"-b 'datadome=x; {SHARED}; _ga=1'")[0] == SHARED
+    assert cookie_candidates(f"-b '{SSESS}; {SHARED}'")[:2] == [SHARED, SSESS]
+
+
+def test_the_whole_cookie_set_is_kept_as_a_last_resort():
+    """If Ten'Up ever wants a companion cookie, sending everything gets through.
+
+    The user has already handed the lot over in a "Copy as cURL", so there is
+    nothing more to ask them for.
+    """
+    from custom_components.tenup.api import cookie_candidates
+
+    pasted = f"datadome=abc; {SESSION}; userStore=%7B%7D"
+    got = cookie_candidates(f"-b '{pasted}'")
+    assert got[0] == SESSION, "the session alone stays the first thing tried"
+    assert got[-1] == pasted, "then everything the browser sends"
+
+
+def test_a_lone_cookie_never_becomes_a_whole_set():
+    from custom_components.tenup.api import cookie_candidates
+
+    assert cookie_candidates(f"Cookie: {SESSION}") == [SESSION]
 
 
 def test_a_bare_uuid_is_tried_as_the_session_cookie_first():

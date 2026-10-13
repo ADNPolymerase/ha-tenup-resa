@@ -113,10 +113,14 @@ def _clean_cookie_text(raw: str) -> str:
 def cookie_candidates(raw: str) -> list[str]:
     """Return the ``name=value`` strings to try for what the user pasted.
 
-    A Drupal session cookie is pulled out of whatever it is buried in, so a
-    whole ``Copy as cURL`` command or a request headers dump can be pasted as
-    is. ``SESSxxx=yyy`` and full ``Cookie:`` headers are returned unchanged,
-    and a bare value (no ``=``) is combined with the known cookie names.
+    The session cookie is pulled out of whatever it is buried in, so a whole
+    ``Copy as cURL`` command or a request headers dump can be pasted as is. A
+    bare value (no ``=``) is combined with the known cookie names.
+
+    When the paste carries other cookies too, the whole set is kept as a last
+    candidate: should Ten'Up one day want a companion cookie alongside the
+    session, sending everything the browser sends is what gets through, and the
+    user has already handed it over.
     """
     text = _clean_cookie_text(raw)
     if not text:
@@ -137,6 +141,9 @@ def cookie_candidates(raw: str) -> list[str]:
                 len(order),
             )
         )
+        whole = _whole_cookie_set(text)
+        if whole and whole not in found:
+            found.append(whole)
         return found
     if "=" in text:
         return [text]
@@ -149,6 +156,19 @@ def cookie_candidates(raw: str) -> list[str]:
             name for name in names if name not in (SESSION_COOKIE_NAME, SHARED_COOKIE_NAME)
         ]
     return [f"{name}={text}" for name in names]
+
+
+# What a "Copy as cURL" wraps the cookies in. The closing quote may already be
+# gone: the text is cleaned of stray quotes before we get here.
+_CURL_PREFIX_RE = re.compile(r"^(?:-b|--cookie)\s+'?|^-H\s+'?[Cc]ookie:\s*", re.IGNORECASE)
+
+
+def _whole_cookie_set(text: str) -> str | None:
+    """Every cookie of a ``Copy as cURL`` or a ``Cookie:`` header, as pasted."""
+    candidate = _CURL_PREFIX_RE.sub("", text).strip().strip("'").strip('"')
+    if ";" in candidate and candidate.count("=") > 1:
+        return candidate
+    return None
 
 
 def parse_cookie_header(raw: str) -> dict[str, str]:
@@ -345,6 +365,9 @@ class TenupClient:
             method, url, headers=headers, data=data
         )
 
+        _LOGGER.debug(
+            "Ten'Up %s %s -> %s (%s)", method, path, status, final_url.host
+        )
         answer: Any = None
         if body.strip():
             try:

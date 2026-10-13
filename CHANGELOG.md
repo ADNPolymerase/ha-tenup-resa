@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.2
+
+### Pasting a whole "Copy as cURL" now sends every cookie
+
+Only the session cookie was pulled out of a paste and sent on. If Ten'Up wants a
+companion cookie alongside it, that narrowing is what keeps the session from
+being accepted, and the user has no way to tell.
+
+The whole cookie set of a "Copy as cURL" or a "Cookie:" header is now kept as a
+last candidate, tried after the session cookie on its own. Nothing more is asked
+of the user: they have already handed the lot over.
+
+Each API answer is also traced at debug level, with its status and the host that
+answered, so a refusal can be told from a waiting room without guessing. No
+value is ever logged.
+
 ## 2.0.1
 
 ### The session cookie changed name, and became HttpOnly
