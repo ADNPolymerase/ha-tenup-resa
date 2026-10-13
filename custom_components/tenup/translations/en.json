@@ -41,7 +41,8 @@
       "no_club": "No club found, try another spelling",
       "invalid_cookie": "This does not look like a cookie value",
       "invalid_auth": "Ten'Up does not recognise this session, log in again and copy a fresh cookie",
-      "no_planning": "Logged in, but the reservation grid of this club is empty (is it your club?)"
+      "no_planning": "Logged in, but the reservation grid of this club is empty (is it your club?)",
+      "wrong_cookie": "That is the site's old cookie: take the SHARED_SESSION_JAVA row, not SHARED_SESSION_DRUPAL"
     },
     "abort": {
       "already_configured": "This club is already configured",

@@ -65,42 +65,24 @@ class TenupBookingError(TenupError):
     """Ten'Up refused a booking or a cancellation, with its own message."""
 
 
-# The session cookie of the member area, named by the site's own code. The 2026
-# rebuild moved the back end from Drupal to Java and renamed the cookie with it;
-# unlike the Drupal one it is HttpOnly, so no bookmarklet can read it and the
-# user copies it from the browser's developer tools.
+# The one cookie Ten'Up authenticates with, named by the site's own code. It is
+# HttpOnly, so it is read from the browser's cookie view and pasted by hand.
 SESSION_COOKIE_NAME = "SHARED_SESSION_JAVA"
 
-# What the previous site used. A browser that has been through the migration
-# still carries it, and it is now refused by the API, so it is accepted only as
-# a last resort: an installation that predates the rebuild keeps loading, and
-# says the session is dead rather than that the cookie is malformed.
-SHARED_COOKIE_NAME = "SHARED_SESSION_DRUPAL"
+# What the member area used before the 2026 rebuild. A browser that lived
+# through it still carries this one, right under the other in the same view and
+# holding a UUID that looks just like it. Ten'Up refuses it now, so it is worth
+# recognising for one reason only: to say so, instead of letting the user
+# discover it as an expired session.
+LEGACY_COOKIE_NAMES = ("SHARED_SESSION_DRUPAL",)
 
-# Drupal 7 named its own session cookie SESS + sha256(cookie domain)[:32], with
-# an SSESS prefix over HTTPS. Kept for the same reason, and because an old entry
-# may still hold one.
-_DOMAIN_HASHES = (
-    "7ba44afc36c80c3faa2b8fa87e7742c5",  # .fft.fr
-    "cb2134c30942b300c65ef3e7a0cb8122",  # tenup.fft.fr
-    "299a1e3cc7881f012747993f99f66379",  # .tenup.fft.fr
-    "92f2eb7df5a16f11bfa33ba3b3d183bd",  # fft.fr
-    "a3f3c315059fce3e5cba5addd6cfa12b",  # www.tenup.fft.fr
-)
-# Only these can carry a value that is not a UUID, so a bare paste that is not
-# one is tried against them alone.
-SESSION_COOKIE_NAMES = tuple(
-    f"{prefix}{h}" for h in _DOMAIN_HASHES for prefix in ("SSESS", "SESS")
-)
-
-# Any of them, wherever it sits: the user can paste a whole "Copy as cURL"
-# command, or the single line the developer tools show, rather than hunt for the
-# value. A value stops at the first separator a shell or a header would use.
-_COOKIE_RE = re.compile(
-    r"\b(SHARED_SESSION_JAVA|SHARED_SESSION_DRUPAL|S?SESS[0-9a-f]{32})=([^;,'\"\s]+)"
-)
-_SESSION_NAME_RE = re.compile(r"S?SESS[0-9a-f]{32}\Z")
+_COOKIE_RE = re.compile(r"\b(SHARED_SESSION_JAVA)=([^;,'\"\s]+)")
+_LEGACY_RE = re.compile(r"\b(SHARED_SESSION_DRUPAL|S?SESS[0-9a-f]{32})=")
 _UUID_RE = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\Z")
+
+
+class WrongCookieError(ValueError):
+    """What was pasted is a Ten'Up cookie, but not the one that signs us in."""
 
 
 def _clean_cookie_text(raw: str) -> str:
@@ -111,68 +93,29 @@ def _clean_cookie_text(raw: str) -> str:
 
 
 def cookie_candidates(raw: str) -> list[str]:
-    """Return the ``name=value`` strings to try for what the user pasted.
+    """Return the ``name=value`` to use for what the user pasted.
 
-    The session cookie is pulled out of whatever it is buried in, so a whole
-    ``Copy as cURL`` command or a request headers dump can be pasted as is. A
-    bare value (no ``=``) is combined with the known cookie names.
-
-    When the paste carries other cookies too, the whole set is kept as a last
-    candidate: should Ten'Up one day want a companion cookie alongside the
-    session, sending everything the browser sends is what gets through, and the
-    user has already handed it over.
+    Only the session cookie is taken. The value alone is enough, since it is
+    what the cookie view puts on the clipboard, and ``SHARED_SESSION_JAVA=...``
+    is accepted as well for anyone who copies the whole pair.
     """
     text = _clean_cookie_text(raw)
     if not text:
         raise ValueError("no cookie found")
-    found: list[str] = []
-    for name, value in _COOKIE_RE.findall(text):
-        pair = f"{name}={value}"
-        if pair not in found:
-            found.append(pair)
+    found = _COOKIE_RE.search(text)
     if found:
-        # The one the site actually authenticates with comes first, then the one
-        # it replaced: the others are only there so an entry made before the 2026
-        # rebuild still loads and reports a dead session rather than a bad cookie.
-        order = (SESSION_COOKIE_NAME, SHARED_COOKIE_NAME)
-        found.sort(
-            key=lambda pair: next(
-                (i for i, name in enumerate(order) if pair.startswith(f"{name}=")),
-                len(order),
-            )
-        )
-        whole = _whole_cookie_set(text)
-        if whole and whole not in found:
-            found.append(whole)
-        return found
-    if "=" in text:
-        return [text]
-    if not text.replace("-", "").replace("_", "").isalnum():
-        raise ValueError("not a cookie value")
-    names = list(SESSION_COOKIE_NAMES)
-    if _UUID_RE.match(text):
-        # Both the session cookie and the one it replaced are plain UUIDs.
-        names = [SESSION_COOKIE_NAME, SHARED_COOKIE_NAME] + [
-            name for name in names if name not in (SESSION_COOKIE_NAME, SHARED_COOKIE_NAME)
-        ]
-    return [f"{name}={text}" for name in names]
-
-
-# What a "Copy as cURL" wraps the cookies in. The closing quote may already be
-# gone: the text is cleaned of stray quotes before we get here.
-_CURL_PREFIX_RE = re.compile(r"^(?:-b|--cookie)\s+'?|^-H\s+'?[Cc]ookie:\s*", re.IGNORECASE)
-
-
-def _whole_cookie_set(text: str) -> str | None:
-    """Every cookie of a ``Copy as cURL`` or a ``Cookie:`` header, as pasted."""
-    candidate = _CURL_PREFIX_RE.sub("", text).strip().strip("'").strip('"')
-    if ";" in candidate and candidate.count("=") > 1:
-        return candidate
-    return None
+        return [f"{found.group(1)}={found.group(2)}"]
+    if _LEGACY_RE.search(text):
+        raise WrongCookieError("that is the cookie Ten'Up replaced")
+    if "=" in text or not _UUID_RE.match(text):
+        # Anything else: a whole header, a cURL command, a stray word. Guessing
+        # would only move the refusal to the next screen.
+        raise ValueError("not a session cookie")
+    return [f"{SESSION_COOKIE_NAME}={text}"]
 
 
 def parse_cookie_header(raw: str) -> dict[str, str]:
-    """Accept ``SESSxxx=yyy`` or a whole ``Cookie:`` header, return name -> value."""
+    """Accept ``NAME=value`` or a whole ``Cookie:`` header, return name -> value."""
     text = _clean_cookie_text(raw)
     cookie: SimpleCookie = SimpleCookie()
     cookie.load(text)
@@ -234,17 +177,10 @@ class TenupClient:
         would still hold the value the user pasted, and the next restart of Home
         Assistant would go back to it and ask for a cookie that never expired.
         """
-        fallback: str | None = None
         for morsel in self._jar:
-            if not morsel.value:
-                continue
-            if morsel.key == SESSION_COOKIE_NAME:
+            if morsel.value and morsel.key == SESSION_COOKIE_NAME:
                 return f"{morsel.key}={morsel.value}"
-            if fallback is None and (
-                morsel.key == SHARED_COOKIE_NAME or _SESSION_NAME_RE.match(morsel.key)
-            ):
-                fallback = f"{morsel.key}={morsel.value}"
-        return fallback
+        return None
 
     # ------------------------------------------------------------------ session
     def set_cookie(self, cookie: str) -> None:

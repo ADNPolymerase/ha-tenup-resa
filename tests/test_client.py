@@ -152,76 +152,64 @@ def client_for(routes, cookie="SHARED_SESSION_DRUPAL=abc"):
 
 
 
-REAL_NAME = "SSESS7ba44afc36c80c3faa2b8fa87e7742c5"
-SHARED_NAME = "SHARED_SESSION_DRUPAL"
-SHARED_VALUE = "aae6fe4e-0700-49d0-84ea-7b283f14affa"
+SESSION_NAME = "SHARED_SESSION_JAVA"
+SESSION_VALUE = "f1e2d3c4-0000-4a5b-8c9d-0e1f2a3b4c5d"
 
 
 def test_session_cookie_reports_what_the_jar_holds():
-    async def main():
-        session = FakeSession({})
-        client = TenupClient(session, f"{REAL_NAME}=pasted", "87654321", TZ)
-        return client.session_cookie
-    assert run(main) == f"{REAL_NAME}=pasted"
+    async def go():
+        client, _ = client_for({}, cookie=f"{SESSION_NAME}={SESSION_VALUE}")
+        assert client.session_cookie == f"{SESSION_NAME}={SESSION_VALUE}"
+
+    run(go)
 
 
 def test_session_cookie_follows_a_rotation_by_tenup():
-    """Drupal can hand out a new session id mid-flight: the config entry must follow."""
-    async def main():
-        session = FakeSession({})
-        client = TenupClient(session, f"{REAL_NAME}=old", "87654321", TZ)
-        session.cookie_jar.update_cookies(
-            {REAL_NAME: "rotated"}, URL("https://tenup.fft.fr")
-        )
-        return client.session_cookie
-    assert run(main) == f"{REAL_NAME}=rotated"
+    """Ten'Up can hand out a new session id while we are using it.
 
-
-def test_session_cookie_ignores_the_other_cookies():
-    """datadome and Queue-it also live in the jar and must never be saved as the session."""
-    async def main():
-        session = FakeSession({})
-        client = TenupClient(session, f"{REAL_NAME}=mine", "87654321", TZ)
-        session.cookie_jar.update_cookies(
-            {"datadome": "abc", "QueueITAccepted": "1", "_ga": "GA1.2"},
+    The jar follows; the config entry would still hold what the user pasted, and
+    the next restart would go back to a session that has been replaced.
+    """
+    async def go():
+        client, _ = client_for({}, cookie=f"{SESSION_NAME}={SESSION_VALUE}")
+        client.session.cookie_jar.update_cookies(
+            {SESSION_NAME: "99999999-1111-4222-8333-444444444444"},
             URL("https://tenup.fft.fr"),
         )
-        return client.session_cookie
-    assert run(main) == f"{REAL_NAME}=mine"
+        assert client.session_cookie.endswith("99999999-1111-4222-8333-444444444444")
+
+    run(go)
 
 
-def test_session_cookie_is_none_without_a_drupal_session():
-    """A jar with no Drupal cookie must not make the coordinator overwrite anything."""
-    async def main():
-        session = FakeSession({})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        return client.session_cookie
-    assert run(main) is None
-
-
-SHARED_NAME = "SHARED_SESSION_DRUPAL"
-SHARED_VALUE = "aae6fe4e-0700-49d0-84ea-7b283f14affa"
-
-
-def test_session_cookie_prefers_the_shared_cookie():
-    """Drupal mints a new SSESS on every start: it must never replace the durable one."""
-    async def main():
-        session = FakeSession({})
-        client = TenupClient(session, f"{SHARED_NAME}={SHARED_VALUE}", "87654321", TZ)
-        session.cookie_jar.update_cookies(
-            {REAL_NAME: "minted-by-drupal"}, URL("https://tenup.fft.fr")
+def test_session_cookie_ignores_everything_else_the_site_sets():
+    """A tracker or a waiting-room token is not a session and must never be stored."""
+    async def go():
+        client, _ = client_for({}, cookie=f"{SESSION_NAME}={SESSION_VALUE}")
+        client.session.cookie_jar.update_cookies(
+            {"datadome": "abc", "userStore": "%7B%7D", "PREFERRED_PRATIQUE": "x"},
+            URL("https://tenup.fft.fr"),
         )
-        return client.session_cookie
-    assert run(main) == f"{SHARED_NAME}={SHARED_VALUE}"
+        assert client.session_cookie == f"{SESSION_NAME}={SESSION_VALUE}"
+
+    run(go)
 
 
-def test_session_cookie_falls_back_to_ssess_without_a_shared_cookie():
-    """Users set up before this existed keep working on their SSESS alone."""
-    async def main():
-        session = FakeSession({})
-        client = TenupClient(session, f"{REAL_NAME}=legacy", "87654321", TZ)
-        return client.session_cookie
-    assert run(main) == f"{REAL_NAME}=legacy"
+def test_session_cookie_is_none_without_a_session():
+    """Nothing to write back beats writing back a cookie that signs nobody in."""
+    async def go():
+        client, _ = client_for({}, cookie="datadome=abc")
+        assert client.session_cookie is None
+
+    run(go)
+
+
+def test_the_cookie_that_was_replaced_is_never_written_back():
+    """An entry that predates the rebuild still holds it; it is not a session."""
+    async def go():
+        client, _ = client_for({}, cookie="SHARED_SESSION_DRUPAL=aae6fe4e-0700-49d0-84ea-7b283f14affa")
+        assert client.session_cookie is None
+
+    run(go)
 
 
 # ------------------------------------------------------------------- planning

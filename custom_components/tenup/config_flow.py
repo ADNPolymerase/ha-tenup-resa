@@ -31,6 +31,7 @@ from homeassistant.helpers.selector import (
 from homeassistant.util import dt as dt_util
 
 from .api import (
+    WrongCookieError,
     TenupAuthError,
     TenupClient,
     TenupConnectionError,
@@ -191,6 +192,10 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             candidates = cookie_candidates(cookie)
             for candidate in candidates:
                 parse_cookie_header(candidate)
+        except WrongCookieError:
+            # Both cookies sit one above the other and both hold a UUID: saying
+            # which one was taken beats letting it fail as an expired session.
+            return "wrong_cookie", cookie
         except ValueError:
             return "invalid_cookie", cookie
         error = "invalid_auth"

@@ -1,121 +1,44 @@
 # Changelog
 
-## 2.0.6
-
-### The "Copy as cURL" shortcut is no longer suggested
-
-It was offered as the easier of the two ways to hand over a session. It is not:
-the Network tab lists every request a page makes, most of them to other sites
-that carry nothing useful, so picking a row means knowing which one. That is
-harder than reading a row in a table, not easier.
-
-The dialogs and both READMEs now describe one way only, the Cookies view, with
-the picture of the row to copy. Pasting a cURL still works for anyone who
-prefers it; it is simply no longer presented as the simple path.
-
-## 2.0.5
-
-### A pasted session no longer inherits the refusals of the dead one
-
-The integration asks for a new cookie only once Ten'Up has refused twice in a
-row, so that a single hiccup never costs the user a trip to the dialog. That
-count deliberately outlives the coordinator, which rebuilds on every setup
-retry, but it also outlived the cookie it was counted against: a session just
-validated started at two, and the first stumble sent the user straight back to
-where they came from.
-
-Validating a session now clears the count, which is sound because the flow has
-just proved that session works.
-
-## 2.0.4
-
-### The dialog now shows which row to copy
-
-Both session cookies are plain UUIDs sitting next to each other, and a browser
-that lived through the rebuild still carries the old one. Nothing in the values
-tells them apart, so the dialog now carries the picture: the row to take in
-green, the one to leave struck through in red.
-
-The screenshots are drawn, not captured: every value in them is a row of dots,
-so no session of anyone's is in this repository.
-
-## 2.0.3
-
-### A pasted session now takes effect without reloading by hand
-
-Since 1.2.0 the update listener owns every reload of the entry, which keeps a
-reauth from being reloaded twice. But that listener is registered at the end of
-a successful setup: an entry that never got that far has none, so a freshly
-pasted session was written and then sat there doing nothing. That is exactly the
-entry a user is most likely to be reauthenticating, and the only way out was a
-restart of Home Assistant.
-
-The flow now wakes an entry that is not loaded, and still leaves a loaded one to
-its listener, which is the race Home Assistant raises on from 2026.12.
-
-## 2.0.2
-
-### Pasting a whole "Copy as cURL" now sends every cookie
-
-Only the session cookie was pulled out of a paste and sent on. If Ten'Up wants a
-companion cookie alongside it, that narrowing is what keeps the session from
-being accepted, and the user has no way to tell.
-
-The whole cookie set of a "Copy as cURL" or a "Cookie:" header is now kept as a
-last candidate, tried after the session cookie on its own. Nothing more is asked
-of the user: they have already handed the lot over.
-
-Each API answer is also traced at debug level, with its status and the host that
-answered, so a refusal can be told from a waiting room without guessing. No
-value is ever logged.
-
-## 2.0.1
-
-### The session cookie changed name, and became HttpOnly
-
-2.0.0 could reach the new API but never authenticate: the rebuild moved the back
-end from Drupal to Java and renamed its session cookie with it. The site's own
-code names `SHARED_SESSION_JAVA`, and no longer mentions the Drupal one at all.
-A browser that lived through the migration still carries the old cookie, which
-is exactly what made the failure confusing: the bookmarklet kept handing over a
-perfectly fresh value that Ten'Up no longer accepts.
-
-The integration now reads and sends the new cookie, and still accepts the old
-ones so an installation made before the rebuild loads and says the session is
-dead rather than that the cookie is malformed.
-
-### The bookmarklet is gone
-
-The new cookie is `HttpOnly`: no page script can read it, so no bookmarklet can
-hand it over. The install page it was served from is removed rather than left
-teaching a method that cannot work.
-
-The session is now copied from the browser's developer tools, Cookies view, or
-by pasting a whole "Copy as cURL" from the Network tab, which the integration
-has always known how to read.
-
 ## 2.0.0
 
 ### Ten'Up rebuilt its member area, and this follows it
 
 The FFT replaced the Drupal site with a new one on 13 October 2026, overnight.
-Every address the integration used answers 404, the reservation grid is no
-longer HTML to read, and the day no longer travels in the URL. Nothing short of
-a new client could keep working.
+Every address the integration used answers **404**, the reservation grid is no
+longer HTML to read, and the day no longer travels in the URL. The entry sat in
+`setup_retry` on "an unexpected page": nothing short of a new client could keep
+working.
 
 It now speaks to the JSON API the new site uses, which is both sturdier and
 plainer: one call returns a day of courts with their slots, who booked them and
 whether the booking can still be cancelled. The HTML parser is gone, and with it
 the whole business of reading a page meant for a browser.
 
-Nothing changes for you. The cookie kept its name, so the bookmarklet still
-works and an existing setup carries on without being touched. The card, the
-sensors, the calendar, the services and the friends list are unchanged.
+The card, the sensors, the calendar, the services and the friends list are
+unchanged.
+
+### The session cookie changed name, and became HttpOnly
+
+The rebuild moved the back end from Drupal to Java and renamed its session
+cookie with it. The site's own code names `SHARED_SESSION_JAVA` and no longer
+mentions the Drupal one anywhere. A browser that lived through the migration
+still carries the old cookie, which is what made the failure confusing: it kept
+handing over a perfectly fresh value that Ten'Up no longer accepts.
+
+That new cookie is `HttpOnly`, so no page script can read it and the bookmarklet
+of earlier versions cannot work. Its install page is removed rather than left
+teaching a method that cannot work: the session is now copied from the browser's
+cookie view, and the dialog carries a picture of the row to take, since both
+cookies sit one above the other and both hold a UUID.
+
+Paste the wrong one and the integration says so, naming the right row, instead
+of letting it fail as an expired session two screens later.
 
 ### A booking may never cost you anything
 
 Ten'Up offers a slot through several "offers": a subscription, a ticket book, or
-a ticket bought online. Only the subscription is free, and the integration now
+a ticket bought online. Only the subscription is free, and the integration
 refuses to book with anything else, for you and for the partner you name.
 
 The old guard looked at the announced price, which no longer tells them apart:
@@ -129,9 +52,19 @@ when tapped. It covers every day Ten'Up returned, not only the days the grid
 shows, and it ignores the court filter: it is your booking, wherever it is. Turn
 it off with "Show your next booking above the grid" in the card editor.
 
+### Reconnecting, when the session dies
+
+Two things used to leave a freshly pasted session doing nothing. The update
+listener owns every reload since 1.2.0, but it is registered at the end of a
+successful setup, so an entry that never got that far had nobody to wake it. And
+the refusal count that keeps one hiccup from asking for a new cookie outlived
+the cookie it was counted against, so a new session started at two.
+
+A pasted session now wakes a dormant entry and starts from zero.
+
 ### Verification
 
-134 Python tests and 214 card assertions. The whole path was walked against the
+130 Python tests and 214 card assertions. The whole path was walked against the
 real site, booked and cancelled: a court for one player, a court for two with a
 club member named by hand, and the cancellation of both.
 

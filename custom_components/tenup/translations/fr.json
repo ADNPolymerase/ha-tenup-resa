@@ -41,7 +41,8 @@
       "no_club": "Aucun club trouvé, essayez une autre orthographe",
       "invalid_cookie": "Ce n'est pas une valeur de cookie",
       "invalid_auth": "Ten'Up ne reconnaît pas cette session : reconnectez-vous et copiez un cookie frais",
-      "no_planning": "Connecté, mais le tableau de réservation de ce club est vide (est-ce bien votre club ?)"
+      "no_planning": "Connecté, mais le tableau de réservation de ce club est vide (est-ce bien votre club ?)",
+      "wrong_cookie": "C'est l'ancien cookie du site : prenez la ligne SHARED_SESSION_JAVA, pas SHARED_SESSION_DRUPAL"
     },
     "abort": {
       "already_configured": "Ce club est déjà configuré",

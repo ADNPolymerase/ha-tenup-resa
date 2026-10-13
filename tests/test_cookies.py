@@ -1,87 +1,106 @@
-"""What the user pastes as a session, and what the card stores as friends.
+"""What the user is allowed to paste as a session, and what is turned away.
 
-Both outlive the site itself: Ten'Up rebuilt its member area in 2026 and kept
-the very same cookie, so these are the parts of the integration a redesign has
-no say over.
+Two Ten'Up cookies sit one above the other in the browser's cookie view, both
+holding a UUID, and only one of them signs anyone in. Nothing in a value says
+which is which, so the refusal has to.
 """
 
 import pytest
 
-from custom_components.tenup.api import parse_cookie_header
+from custom_components.tenup.api import (
+    SESSION_COOKIE_NAME,
+    WrongCookieError,
+    cookie_candidates,
+    parse_cookie_header,
+)
+
+UUID = "f1e2d3c4-0000-4a5b-8c9d-0e1f2a3b4c5d"
+SESSION = f"{SESSION_COOKIE_NAME}={UUID}"
 
 
-def test_cookie_header():
-    assert parse_cookie_header("SESSabc=123") == {"SESSabc": "123"}
-    assert parse_cookie_header("Cookie: SESSabc=123; datadome=xyz") == {"SESSabc": "123", "datadome": "xyz"}
+def test_the_value_alone_is_enough():
+    """It is what double-clicking the Value cell puts on the clipboard."""
+    assert cookie_candidates(UUID) == [SESSION]
+    assert cookie_candidates(f"  {UUID} \n") == [SESSION]
+
+
+def test_the_whole_pair_is_taken_too():
+    assert cookie_candidates(SESSION) == [SESSION]
+    assert cookie_candidates(f"Cookie: {SESSION}") == [SESSION]
+
+
+def test_the_session_is_found_among_other_cookies():
+    """Copying the row sometimes drags its neighbours along."""
+    assert cookie_candidates(f"datadome=abc; {SESSION}; userStore=%7B%7D") == [SESSION]
+
+
+def test_the_cookie_that_was_replaced_is_named_rather_than_tried():
+    """The trap: it is one row away and holds a UUID that looks the same.
+
+    Accepting it would turn a copying mistake into an expired session two
+    screens later, which is exactly how an evening gets lost.
+    """
+    with pytest.raises(WrongCookieError):
+        cookie_candidates(f"SHARED_SESSION_DRUPAL={UUID}")
+    with pytest.raises(WrongCookieError):
+        cookie_candidates("SSESS7ba44afc36c80c3faa2b8fa87e7742c5=Kj3-nV_9xQp2")
+    with pytest.raises(WrongCookieError):
+        cookie_candidates(f"datadome=x; SHARED_SESSION_DRUPAL={UUID}; _ga=1")
+
+
+def test_the_session_wins_when_both_are_pasted():
+    both = f"SHARED_SESSION_DRUPAL=aae6fe4e-0700-49d0-84ea-7b283f14affa; {SESSION}"
+    assert cookie_candidates(both) == [SESSION]
+
+
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        "",
+        "   ",
+        "bonjour",
+        "abc-DEF_123",
+        "curl 'https://tenup.fft.fr/api/back/v1/profil' -H 'accept: application/json'",
+        "userStore=%7B%22isLogged%22%3Atrue%7D",
+    ],
+)
+def test_anything_else_is_refused_now_rather_than_later(pasted):
+    """Guessing would only move the refusal to the next screen."""
+    with pytest.raises(ValueError):
+        cookie_candidates(pasted)
+
+
+def test_a_wrong_cookie_is_still_a_value_error():
+    """The flow catches the precise one first, but nothing else has to know."""
+    assert issubclass(WrongCookieError, ValueError)
+
+
+def test_the_header_parser_reads_a_pair_and_a_whole_header():
+    assert parse_cookie_header(SESSION) == {SESSION_COOKIE_NAME: UUID}
+    assert parse_cookie_header(f"Cookie: {SESSION}; datadome=xyz") == {
+        SESSION_COOKIE_NAME: UUID,
+        "datadome": "xyz",
+    }
     with pytest.raises(ValueError):
         parse_cookie_header("   ")
 
 
-def test_cookie_candidates():
-    from custom_components.tenup.api import SESSION_COOKIE_NAMES, cookie_candidates
+def test_the_flow_tells_the_two_cookies_apart():
+    """A copying mistake earns its own message, not "session expired"."""
+    import json
+    from pathlib import Path
 
-    assert cookie_candidates("SESSabc=123") == ["SESSabc=123"]
-    assert cookie_candidates("Cookie: SESSabc=123; datadome=x") == ["SESSabc=123; datadome=x"]
-    bare = cookie_candidates("  abc-DEF_123\n")
-    assert bare == [f"{name}=abc-DEF_123" for name in SESSION_COOKIE_NAMES]
-    assert bare[0].startswith("SSESS7ba44afc36c80c3faa2b8fa87e7742c5=")
-    assert bare[1].startswith("SESS7ba44afc36c80c3faa2b8fa87e7742c5=")
-    assert len(bare) == 10
-    with pytest.raises(ValueError):
-        cookie_candidates("not a cookie value!")
-    with pytest.raises(ValueError):
-        cookie_candidates("   ")
+    from custom_components import tenup
 
+    flow = (Path(tenup.__file__).parent / "config_flow.py").read_text(encoding="utf-8")
+    assert "except WrongCookieError:" in flow
+    assert '"wrong_cookie"' in flow
 
-CURL_PASTE = """curl 'https://tenup.fft.fr/recherche/875800/disponibilites?date=2026-09-12' \\
-  -H 'accept: text/html,application/xhtml+xml' \\
-  -H 'accept-language: fr-FR,fr;q=0.9' \\
-  -b 'datadome=9vKq~Nope; SSESS7ba44afc36c80c3faa2b8fa87e7742c5=aBcD-eF_1234; _ga=GA1.2.7' \\
-  -H 'user-agent: Mozilla/5.0' """
-
-
-def test_cookie_candidates_accepts_a_copy_as_curl_paste():
-    """One right-click in the Network tab must be enough: no cookie hunting."""
-    from custom_components.tenup.api import cookie_candidates
-
-    assert cookie_candidates(CURL_PASTE)[:1] == [
-        "SSESS7ba44afc36c80c3faa2b8fa87e7742c5=aBcD-eF_1234"
-    ]
-
-
-def test_cookie_candidates_drops_everything_but_the_session_cookie():
-    """A pasted request carries datadome, analytics and the URL: none is stored."""
-    from custom_components.tenup.api import cookie_candidates
-
-    only = cookie_candidates(CURL_PASTE)[0]
-    for leak in ("datadome", "9vKq", "_ga", "GA1.2.7", "user-agent", "tenup.fft.fr"):
-        assert leak not in only, leak
-
-
-def test_cookie_candidates_extracts_an_unknown_domain_hash():
-    """The FFT may re-host the site: match the shape, not the known hashes."""
-    from custom_components.tenup.api import SESSION_COOKIE_NAMES, cookie_candidates
-
-    name = "SSESS0123456789abcdef0123456789abcdef"
-    assert name not in SESSION_COOKIE_NAMES
-    assert cookie_candidates(f"-H 'cookie: {name}=zZz9'") == [f"{name}=zZz9"]
-
-
-def test_cookie_candidates_deduplicates_a_repeated_cookie():
-    """Chrome writes the cookie in both -b and -H 'cookie:'; try it once."""
-    from custom_components.tenup.api import cookie_candidates
-
-    pair = "SSESS7ba44afc36c80c3faa2b8fa87e7742c5=dup1"
-    assert cookie_candidates(f"-b '{pair}' -H 'cookie: {pair}'") == [pair]
-
-
-def test_cookie_candidates_keeps_a_plain_header_untouched():
-    """No Drupal cookie in sight: the old behaviour must survive."""
-    from custom_components.tenup.api import cookie_candidates
-
-    assert cookie_candidates("Cookie: SESSabc=123; datadome=x") == ["SESSabc=123; datadome=x"]
-
-
+    texts = json.loads(
+        (Path(tenup.__file__).parent / "translations/fr.json").read_text(encoding="utf-8")
+    )
+    message = texts["config"]["error"]["wrong_cookie"]
+    assert "SHARED_SESSION_JAVA" in message and "SHARED_SESSION_DRUPAL" in message
 
 
 def test_friend_list_is_cleaned_before_being_stored():
@@ -94,75 +113,3 @@ def test_friend_list_is_cleaned_before_being_stored():
     assert clean_friends(["", "  ", "a", "ab"]) == [], "nothing usable survives"
     assert clean_friends(["abc"]) == ["abc"], "three characters is the floor"
     assert len(clean_friends([f"ami{n}" for n in range(MAX_FRIENDS + 20)])) == MAX_FRIENDS
-
-
-SESSION = "SHARED_SESSION_JAVA=f1e2d3c4-0000-4a5b-8c9d-0e1f2a3b4c5d"
-SHARED = "SHARED_SESSION_DRUPAL=aae6fe4e-0700-49d0-84ea-7b283f14affa"
-SSESS = "SSESS7ba44afc36c80c3faa2b8fa87e7742c5=Kj3-nV_9xQp2"
-
-
-def test_the_session_cookie_is_pulled_out_of_a_copy_as_curl():
-    """The one the site authenticates with, among everything a browser carries."""
-    from custom_components.tenup.api import cookie_candidates
-
-    got = cookie_candidates(f"-b 'datadome=x; {SESSION}; userStore=%7B%7D'")
-    assert got[0] == SESSION
-
-
-def test_the_session_cookie_comes_before_the_one_it_replaced():
-    """A browser that lived through the 2026 rebuild still carries the old one.
-
-    It is accepted so an entry made before the rebuild still loads, but it is no
-    longer what Ten'Up authenticates with, so it must never be tried first.
-    """
-    from custom_components.tenup.api import cookie_candidates
-
-    assert cookie_candidates(f"-b '{SSESS}; {SHARED}; {SESSION}'")[0] == SESSION
-
-
-def test_the_old_cookies_are_still_read_on_their_own():
-    from custom_components.tenup.api import cookie_candidates
-
-    assert cookie_candidates(f"-b 'datadome=x; {SHARED}; _ga=1'")[0] == SHARED
-    assert cookie_candidates(f"-b '{SSESS}; {SHARED}'")[:2] == [SHARED, SSESS]
-
-
-def test_the_whole_cookie_set_is_kept_as_a_last_resort():
-    """If Ten'Up ever wants a companion cookie, sending everything gets through.
-
-    The user has already handed the lot over in a "Copy as cURL", so there is
-    nothing more to ask them for.
-    """
-    from custom_components.tenup.api import cookie_candidates
-
-    pasted = f"datadome=abc; {SESSION}; userStore=%7B%7D"
-    got = cookie_candidates(f"-b '{pasted}'")
-    assert got[0] == SESSION, "the session alone stays the first thing tried"
-    assert got[-1] == pasted, "then everything the browser sends"
-
-
-def test_a_lone_cookie_never_becomes_a_whole_set():
-    from custom_components.tenup.api import cookie_candidates
-
-    assert cookie_candidates(f"Cookie: {SESSION}") == [SESSION]
-
-
-def test_a_bare_uuid_is_tried_as_the_session_cookie_first():
-    """Pasting just the value must not send a UUID as a Drupal session id."""
-    from custom_components.tenup.api import cookie_candidates
-
-    got = cookie_candidates("  f1e2d3c4-0000-4a5b-8c9d-0e1f2a3b4c5d \n")
-    assert got[0] == SESSION
-    assert got[1].startswith("SHARED_SESSION_DRUPAL="), "the old one stays a fallback"
-
-
-def test_a_bare_non_uuid_is_never_read_as_one_of_the_shared_cookies():
-    from custom_components.tenup.api import (
-        SESSION_COOKIE_NAME,
-        SHARED_COOKIE_NAME,
-        cookie_candidates,
-    )
-
-    got = cookie_candidates("abc-DEF_123")
-    assert not any(c.startswith(SHARED_COOKIE_NAME) for c in got)
-    assert not any(c.startswith(SESSION_COOKIE_NAME) for c in got)
