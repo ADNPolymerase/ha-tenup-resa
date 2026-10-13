@@ -1,4 +1,4 @@
-const CARD_VERSION = "2.1.1";
+const CARD_VERSION = "2.1.2";
 
 console.info(
   "%c HA-TENUP-CARD %c v" + CARD_VERSION + " ",
@@ -739,11 +739,13 @@ class TenupCard extends HTMLElement {
     return `<div class="${cls}">${head}${next}${body}${extra}</div>`;
   }
 
-  _siteUrlForDate(dateOrIso) {
+  // The day used to travel in the address. The rebuilt site answers 404 to that
+  // and takes no date at all, in the path or in the query, so every link lands
+  // on today and the visitor moves from there.
+  _siteUrlForDate(_dateOrIso) {
     const code = this._data && this._data.club_code;
     if (!code) return null;
-    const ymd = dateOrIso ? "/" + String(dateOrIso).slice(0, 10).replace(/-/g, "") : "";
-    return `https://tenup.fft.fr/club/${encodeURIComponent(code)}/reservations${ymd}`;
+    return `https://tenup.fft.fr/club/${encodeURIComponent(code)}/reservations`;
   }
 
   _siteUrl() {

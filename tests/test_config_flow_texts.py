@@ -78,8 +78,7 @@ def test_the_dialog_names_the_cookie_to_copy(monkeypatch):
 def test_the_first_step_points_at_the_club_grid(monkeypatch):
     """The shared cookie only exists inside the reservation area."""
     values = make_flow(monkeypatch=monkeypatch)._placeholders()
-    assert values["club_url"].startswith("https://tenup.fft.fr/club/87654321/reservations/")
-    assert values["club_url"][-8:].isdigit()
+    assert values["club_url"] == "https://tenup.fft.fr/club/87654321/reservations"
 
 
 def test_the_grid_link_follows_each_users_own_club(monkeypatch):
@@ -89,7 +88,7 @@ def test_the_grid_link_follows_each_users_own_club(monkeypatch):
         flow = make_flow(monkeypatch=monkeypatch)
         flow._club_code = code
         url = flow._placeholders()["club_url"]
-        assert f"/club/{code}/reservations/" in url, code
+        assert url == f"https://tenup.fft.fr/club/{code}/reservations", code
         urls.add(url)
     assert len(urls) == 2
 

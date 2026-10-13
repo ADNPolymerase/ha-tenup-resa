@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.2
+
+### The links to Ten'Up no longer point at a 404
+
+They carried the day in the address, `.../reservations/20261020`, which the
+rebuilt site answers 404 to. It takes no date at all, in the path or in the
+query, so every link now lands on the club's grid for today.
+
+Four places were affected: the open-on-Ten'Up icon in the card header, the way
+out offered by an error banner, the one in the booking dialog, and the "open
+your club's planning" link of the reauthentication form, which is the first
+thing a user sees when their session has died.
+
+The one thing lost is aiming at the day the card is showing. The site no longer
+allows it.
+
 ## 2.1.1
 
 ### The unbookable bands are red rather than grey

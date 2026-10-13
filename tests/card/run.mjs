@@ -245,11 +245,12 @@ ok('french strings', H.t({ language: 'fr' }, {}, 'book') === 'Réserver' && H.t(
 {
   const card = await makeCard({ days: 2 });
   const url = card._siteUrl();
-  ok('site link uses club code + selected day', url === 'https://tenup.fft.fr/club/87654321/reservations/20260910');
+  ok('site link uses the club code', url === 'https://tenup.fft.fr/club/87654321/reservations');
   card._day = 1;
-  ok('site link follows the day tab', card._siteUrl() === 'https://tenup.fft.fr/club/87654321/reservations/20260912');
+  ok('the day never travels in the address, the site 404s on it',
+     card._siteUrl() === 'https://tenup.fft.fr/club/87654321/reservations');
   card._day = 0;
-  contains('header shows an Open-on-Ten\'Up anchor to the site', card._markup(NOW), 'href="https://tenup.fft.fr/club/87654321/reservations/20260910"');
+  contains('header shows an Open-on-Ten\'Up anchor to the site', card._markup(NOW), 'href="https://tenup.fft.fr/club/87654321/reservations"');
   contains('the site link opens in a new tab safely', card._markup(NOW), 'rel="noopener noreferrer"');
 }
 {
@@ -264,14 +265,14 @@ ok('french strings', H.t({ language: 'fr' }, {}, 'book') === 'Réserver' && H.t(
   card._request('book', card._findSlot('21099', '2026-09-10T21:00:00+02:00') || card._findSlot('21101', '2026-09-10T20:00:00+02:00'));
   await new Promise((r) => setTimeout(r, 0));
   const html = card._markup(NOW);
-  contains('a refusal toast offers the direct site link', html, '<a href="https://tenup.fft.fr/club/87654321/reservations/20260910"');
+  contains('a refusal toast offers the direct site link', html, '<a href="https://tenup.fft.fr/club/87654321/reservations"');
   ok('the refusal keeps the Ten\'Up message', card._toast.kind === 'err' && /2 joueurs/.test(card._toast.text));
 }
 
 // -- 2-player courts flagged + linked to the site (option B) --------------------
 {
   const card = await makeCard({ days: 1 });
-  ok('site link for a date is built from the club code', card._siteUrlForDate('2026-09-11T08:00:00+02:00') === 'https://tenup.fft.fr/club/87654321/reservations/20260911');
+  ok('a date changes nothing to the address', card._siteUrlForDate('2026-09-11T08:00:00+02:00') === 'https://tenup.fft.fr/club/87654321/reservations');
   card._data = { ...DATA, days: [{ date: '2026-09-11', slots: [
     slot('21099', '2026-09-11T10:00:00+02:00', '2026-09-11T11:00:00+02:00', 'free', { required_players: 2 }),
     slot('21100', '2026-09-11T10:00:00+02:00', '2026-09-11T11:00:00+02:00', 'free', { required_players: 1 }),
@@ -633,7 +634,7 @@ const click = (card, attrs) => card._onClick({
   const dlg = card._markup(NOW);
   contains('the dialog offers a search field', dlg, 'id="tenup-partner"');
   contains('and a search button', dlg, 'data-action="partner-search"');
-  contains('the site stays reachable as a way out', dlg, 'href="https://tenup.fft.fr/club/87654321/reservations/20260911"');
+  contains('the site stays reachable as a way out', dlg, 'href="https://tenup.fft.fr/club/87654321/reservations"');
 
   const before = ws.length;
   card._pending = { kind: 'partner_pick', slot: two, query: 'ab' };
