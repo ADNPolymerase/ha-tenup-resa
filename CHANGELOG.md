@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.1
+
+### The unbookable bands are red rather than grey
+
+They sit between bookings, so neutral grey read as "nothing here yet". In the
+same red as a taken slot, they read as what they are: time the club is not
+giving away.
+
 ## 2.1.0
 
 ### The gaps left by 90-minute lessons are drawn, not left blank

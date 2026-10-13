@@ -1,4 +1,4 @@
-const CARD_VERSION = "2.1.0";
+const CARD_VERSION = "2.1.1";
 
 console.info(
   "%c HA-TENUP-CARD %c v" + CARD_VERSION + " ",
@@ -317,9 +317,9 @@ const STYLE = `
   .dialog .fname { width: 100%; box-sizing: border-box; margin-top: 10px; padding: 7px 9px;
                    border-radius: 6px; border: 1px solid var(--divider-color);
                    background: var(--card-background-color); color: var(--primary-text-color); font-size: 1em; }
-  .cell.closed { cursor: default; border: 1px solid var(--divider-color);
+  .cell.closed { cursor: default; border: 1px solid rgba(239, 120, 120, 0.45);
     background: repeating-linear-gradient(45deg, transparent, transparent 4px,
-      rgba(127, 127, 127, 0.30) 4px, rgba(127, 127, 127, 0.30) 8px); }
+      rgba(239, 120, 120, 0.38) 4px, rgba(239, 120, 120, 0.38) 8px); }
   .cell.past { background: rgba(127, 127, 127, 0.14); color: var(--disabled-text-color); border: 1px solid var(--divider-color); }
   .cell.mine { background: #1565c0; color: #fff; cursor: pointer; border: 1px solid #64b5f6; }
   .cell.pending { background: #4a4a57; color: #f1f1f5; border: 1px solid #7b7b8b; cursor: progress;
