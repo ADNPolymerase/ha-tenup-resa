@@ -1,4 +1,4 @@
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "2.0.0";
 
 console.info(
   "%c HA-TENUP-CARD %c v" + CARD_VERSION + " ",
@@ -46,6 +46,8 @@ const T = {
     days: "Days shown (1 to 7)", start_hour: "First hour shown", end_hour: "Last hour shown",
     courts: "Courts shown (empty = all)", show_names: "Show who booked the busy slots",
     confirm: "Ask for confirmation before booking or cancelling", compact: "Compact cells",
+    next_booking: "Show your next booking above the grid",
+    next_title: "Your next booking",
     language: "Language", language_auto: "Follow Home Assistant",
   },
   fr: {
@@ -79,6 +81,8 @@ const T = {
     days: "Jours affich\u00e9s (1 \u00e0 7)", start_hour: "Premi\u00e8re heure affich\u00e9e", end_hour: "Derni\u00e8re heure affich\u00e9e",
     courts: "Courts affich\u00e9s (vide = tous)", show_names: "Afficher qui a r\u00e9serv\u00e9 les cr\u00e9neaux occup\u00e9s",
     confirm: "Demander confirmation avant de r\u00e9server ou d'annuler", compact: "Cellules compactes",
+    next_booking: "Afficher votre prochaine r\u00e9servation au-dessus de la grille",
+    next_title: "Votre prochaine r\u00e9servation",
     language: "Langue", language_auto: "Suivre Home Assistant",
   },
 };
@@ -332,6 +336,16 @@ const STYLE = `
   .toast.err { background: #b3261e; color: #fdecea; }
   .toast a { color: inherit; font-weight: 600; }
   .empty { color: var(--secondary-text-color); font-style: italic; padding: 12px 0; }
+  .next { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    margin: 0 0 8px; padding: 8px 10px; border-radius: 6px; width: 100%;
+    border: 1px solid var(--divider-color); background: var(--card-background-color);
+    color: inherit; font: inherit; text-align: left; }
+  button.next { cursor: pointer; }
+  button.next:hover { border-color: var(--primary-color); }
+  .next .when { font-weight: 600; }
+  .next .where { color: var(--secondary-text-color); }
+  .next .tag { font-size: 0.75em; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--primary-color); }
   ha-card { position: relative; overflow: hidden; }
 `;
 
@@ -420,6 +434,42 @@ class TenupCard extends HTMLElement {
     if (!this._data || !this._data.days) return [];
     const n = Math.max(1, Math.min(14, Number(this._config.days) || 3));
     return this._data.days.slice(0, n);
+  }
+
+  // The one thing the user opens the card for when they are not booking: when
+  // do I play next. Every day Ten'Up returned is searched, not only the days the
+  // grid shows, so a booking further out is still announced.
+  _nextBooking(now) {
+    const days = (this._data && this._data.days) || [];
+    let best = null;
+    days.forEach((day, index) => {
+      (day.slots || []).forEach((slot) => {
+        if (slot.state !== "mine") return;
+        if (new Date(slot.end).getTime() <= now) return;
+        const start = new Date(slot.start).getTime();
+        if (best === null || start < best.start) {
+          best = { slot, start, date: day.date, index: index < this._days().length ? index : -1 };
+        }
+      });
+    });
+    return best;
+  }
+
+  _nextMarkup(now) {
+    const hass = this._hass, cfg = this._config;
+    const next = this._nextBooking(now);
+    if (!next) return "";
+    const when =
+      `${esc(dayLabel(hass, cfg, next.date))} ${esc(hhmm(next.slot.start))}` +
+      `\u2013${esc(hhmm(next.slot.end))}`;
+    const inner =
+      `<span class="tag">${esc(t(hass, cfg, "next_title"))}</span>` +
+      `<span class="when">${when}</span>` +
+      `<span class="where">${esc(next.slot.court_name || "")}</span>`;
+    // Tapping it opens the day it falls on, which is the move anyone makes next.
+    return next.index >= 0
+      ? `<button class="next" data-action="day" data-index="${next.index}">${inner}</button>`
+      : `<div class="next">${inner}</div>`;
   }
 
   _courts() {
@@ -658,6 +708,8 @@ class TenupCard extends HTMLElement {
     head += `<button class="icon" data-action="friends" title="${esc(t(hass, cfg, "friends_manage"))}"><ha-icon icon="mdi:account-heart"></ha-icon>${this._friends().length ? `<span class="badge">${this._friends().length}</span>` : ""}</button>`;
     head += `<button class="icon" data-action="refresh" title="${esc(t(hass, cfg, "refresh"))}"><ha-icon icon="mdi:refresh"></ha-icon></button></div></div>`;
 
+    const next = cfg.next_booking === false ? "" : this._nextMarkup(now);
+
     let body;
     if (!this._data) {
       body = `<div class="empty">${esc(this._error ? this._error : t(hass, cfg, this._hass ? "loading" : "no_data"))}</div>`;
@@ -676,7 +728,7 @@ class TenupCard extends HTMLElement {
       extra += `<div class="toast ${this._toast.kind}">${esc(this._toast.text)}${link}</div>`;
     }
     if (this._pending) extra += this._dialog(this._pending);
-    return `<div class="${cls}">${head}${body}${extra}</div>`;
+    return `<div class="${cls}">${head}${next}${body}${extra}</div>`;
   }
 
   _siteUrlForDate(dateOrIso) {
@@ -1017,6 +1069,7 @@ class TenupCardEditor extends HTMLElement {
       schema.push({ name: "courts", selector: { select: { multiple: true, mode: "list", options: this._courts } } });
     }
     schema.push(
+      { name: "next_booking", selector: { boolean: {} } },
       { name: "show_names", selector: { boolean: {} } },
       { name: "confirm", selector: { boolean: {} } },
       { name: "compact", selector: { boolean: {} } },
@@ -1032,7 +1085,8 @@ class TenupCardEditor extends HTMLElement {
     return {
       name: c.name || "", entry_id: c.entry_id || "", days: c.days !== undefined ? c.days : 3,
       start_hour: c.start_hour, end_hour: c.end_hour, courts: c.courts || [],
-      show_names: c.show_names !== false, confirm: c.confirm !== false, compact: !!c.compact,
+      next_booking: c.next_booking !== false, show_names: c.show_names !== false,
+      confirm: c.confirm !== false, compact: !!c.compact,
       language: c.language || "auto",
     };
   }
@@ -1059,6 +1113,7 @@ class TenupCardEditor extends HTMLElement {
     set("start_hour", Number(value.start_hour), value.start_hour === undefined || value.start_hour === null || value.start_hour === "");
     set("end_hour", Number(value.end_hour), value.end_hour === undefined || value.end_hour === null || value.end_hour === "");
     set("courts", value.courts, !Array.isArray(value.courts) || !value.courts.length);
+    set("next_booking", false, value.next_booking !== false);
     set("show_names", false, value.show_names !== false);
     set("confirm", false, value.confirm !== false);
     set("compact", true, !value.compact);

@@ -109,9 +109,31 @@ ok('french strings', H.t({ language: 'fr' }, {}, 'book') === 'Réserver' && H.t(
 }
 {
   const card = await makeCard({ courts: ['21100'] });
-  const html = card._markup(NOW);
+  // The banner above announces our own booking wherever it is, so the filter is
+  // judged on the grid alone.
+  const html = card._markup(NOW).split('<div class="tabs">').pop();
   ok('courts filter keeps only the listed court', html.includes('COURT 1') && !html.includes('COURT 2') && !html.includes('Court COUVERT'));
   contains('the free count follows the filter', html, '<span class="n">1</span>');
+}
+{
+  const card = await makeCard({ courts: ['21100'] });
+  ok('our own booking is announced even on a court the filter hides',
+     card._markup(NOW).includes('Court COUVERT'));
+}
+{
+  const card = await makeCard({ language: 'fr' });
+  const html = card._markup(NOW);
+  contains('the next booking is announced above the grid', html, 'Votre prochaine r\u00e9servation');
+  ok('the banner comes before the grid',
+     html.indexOf('class="next"') < html.indexOf('<div class="tabs">'));
+  ok('the banner opens the day it falls on', html.includes('class="next" data-action="day"'));
+  const next = card._nextBooking(NOW);
+  ok('the banner announces the soonest booking still to come',
+     next && new Date(next.slot.end).getTime() > NOW);
+}
+{
+  const card = await makeCard({ next_booking: false });
+  ok('the option turns the banner off', !card._markup(NOW).includes('class="next"'));
 }
 {
   const card = await makeCard({ days: 2, language: 'fr' });

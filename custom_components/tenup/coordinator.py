@@ -18,7 +18,6 @@ from .api import (
     TenupBookingError,
     TenupClient,
     TenupConnectionError,
-    parse_partner_choice,
 )
 from .const import (
     AUTH_FAILURES,
@@ -33,9 +32,11 @@ from .const import (
     SLOT_FREE,
     SLOT_MINE,
 )
-from .parser import (
+from .models import (
+    Partner,
     Planning,
     Slot,
+    parse_partner_choice,
     partner_search_term,
     resolve_partner,
 )
@@ -182,9 +183,9 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
                 raise UpdateFailed(str(err)) from err
             self._auth_failures = 0
             data.plannings[day] = planning
-            if planning.window_end and datetime.combine(
-                day + timedelta(days=1), datetime.min.time(), planning.window_end.tzinfo
-            ) > planning.window_end:
+            # Ten'Up states the last day it will take a booking for; asking for
+            # the day after only returns an empty grid.
+            if planning.window_end and day >= planning.window_end:
                 break
         await self._annotate_required_players(data)
         self._persist_rotated_cookie()
@@ -215,7 +216,7 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
             s
             for planning in data.plannings.values()
             for s in planning.slots
-            if s.state == SLOT_FREE and s.book_path and s.creneau_id
+            if s.state == SLOT_FREE and s.creneau_id
         ]
         pending: dict[str, Slot] = {}
         for slot in free:
@@ -223,7 +224,7 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
                 pending[slot.creneau_id] = slot
         learned = 0
         for creneau_id, slot in list(pending.items())[:MAX_PLAYER_LOOKUPS]:
-            players = await self.client.async_required_players(slot.book_path)
+            players = await self.client.async_required_players(slot)
             if players is not None:
                 self._players_cache[creneau_id] = players
                 learned += 1
@@ -233,22 +234,23 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
             slot.required_players = self._players_cache.get(slot.creneau_id)
 
     async def async_book(self, slot: Slot, partner: str | None = None) -> str:
-        choice: str | None = None
-        formula: str | None = None
-        if partner:
-            choice, formula = await self._resolve_partner(slot, partner)
-        result = await self.client.async_book(slot, choice, formula)
+        chosen = await self._resolve_partner(partner) if partner else None
+        result = await self.client.async_book(slot, chosen)
         self._apply_locally(slot.mark_mine)
         await self.async_request_refresh()
         return result
 
-    async def _resolve_partner(self, slot: Slot, partner: str) -> tuple[str, str | None]:
-        """Turn a stored friend into the exact choice Ten'Up expects.
+    async def _resolve_partner(self, partner: str) -> Partner:
+        """Turn a stored friend into the club member Ten'Up expects.
 
-        The user stores a name; Ten'Up wants the autocomplete key, which carries
-        the member id. Two homonyms are never resolved silently: a father and
-        his son share a surname, so an ambiguous name asks rather than guesses.
+        The card stores the member id alongside the name, so the usual case
+        needs no call at all. A bare name, typed by hand or saved by an older
+        version, is searched for instead; two homonyms are never resolved
+        silently, since a father and his son share a surname.
         """
+        known = parse_partner_choice(partner)
+        if known is not None:
+            return known
         results = await self.client.async_search_partner(partner_search_term(partner))
         candidates = resolve_partner(results, partner)
         if not candidates:
@@ -256,23 +258,12 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
                 f"Aucun adhérent du club ne correspond à « {partner} »"
             )
         if len(candidates) > 1:
-            names = ", ".join(display for _choice, display in candidates)
+            names = ", ".join(found.name for found in candidates)
             raise TenupBookingError(
                 f"Plusieurs adhérents correspondent à « {partner} » : {names}. "
                 "Précisez le prénom."
             )
-        choice, display = candidates[0]
-        parsed = parse_partner_choice(choice)
-        if parsed is None:
-            raise TenupBookingError(f"Ten'Up n'a pas donné d'identifiant pour {display}")
-        formulas = await self.client.async_partner_formulas(
-            slot.book_path or "", parsed[1]
-        )
-        if not formulas:
-            raise TenupBookingError(
-                f"Ten'Up ne propose aucune formule gratuite pour {display}"
-            )
-        return choice, str(formulas[0].get("value") or "")
+        return candidates[0]
 
     async def async_cancel(self, slot: Slot) -> None:
         try:

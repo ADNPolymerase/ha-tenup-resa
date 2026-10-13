@@ -1,21 +1,94 @@
-"""Exercise TenupClient against a fake aiohttp session (kwargs, cookies, Queue-it, auth)."""
+"""Exercise TenupClient against a fake aiohttp session.
+
+Ten'Up answers JSON now, so what is worth pinning down is what we send it: the
+right query, the right body, and above all a booking that can never cost the
+user anything. Every name and member id here is invented.
+"""
 import asyncio
-from datetime import date, timedelta, timezone
-from pathlib import Path
+import json
+from datetime import date, datetime, timedelta, timezone
 
 import aiohttp
 import pytest
 from yarl import URL
 
-from custom_components.tenup.api import TenupAuthError, TenupBookingError, TenupClient, TenupConnectionError
+from custom_components.tenup.api import (
+    TenupAuthError,
+    TenupBookingError,
+    TenupClient,
+    TenupConnectionError,
+)
+from custom_components.tenup.models import Partner, Slot
+from custom_components.tenup.const import SLOT_FREE
 
-FIXTURES = Path(__file__).parent / "fixtures"
 TZ = timezone(timedelta(hours=2))
-PLANNING = (FIXTURES / "planning.html").read_text(encoding="utf-8")
+ME = 10000000001
+FRIEND = 10000000002
+
+PROFILE = {"id": ME, "idPersonne": 999, "nom": "DOE", "prenom": "Alex"}
+
+
+def offer(offer_id, kind, players=1, eligible=True, erreur=None):
+    return {
+        "id": offer_id,
+        "type": kind,
+        "libelle": "Adultes" if kind == "AB" else "Tickets",
+        "ticketsRestant": None if kind == "AB" else 5,
+        "eligible": eligible,
+        "erreur": erreur,
+        "nombreJoueursObligatoires": players,
+        "tarifTicket": 6,
+    }
+
+
+def eligibility(*offers, id_crm=ME):
+    return {
+        "joueursSupplementairesAutorises": False,
+        "joueursExternesAutorises": True,
+        "joueur": {"idCrm": id_crm, "offres": list(offers)},
+        "partenairesRecents": [],
+    }
+
+
+PLANNING = {
+    "dateFin": "2026-10-20",
+    "courts": [
+        {
+            "id": 37195,
+            "nom": "PLATRE 1",
+            "couvert": False,
+            "eclaire": True,
+            "surface": {"libelle": "Béton poreux"},
+            "creneaux": [
+                {
+                    "heureDebut": "20:00:00",
+                    "heureFin": "21:00:00",
+                    "id": 56132,
+                    "reservable": True,
+                    "surcharge": None,
+                    "reservation": None,
+                }
+            ],
+        }
+    ],
+}
+
+
+def free_slot():
+    return Slot(
+        court_id="37195",
+        court_name="PLATRE 1",
+        start=datetime(2026, 10, 16, 20, 0, tzinfo=TZ),
+        end=datetime(2026, 10, 16, 21, 0, tzinfo=TZ),
+        state=SLOT_FREE,
+        creneau_id="56132",
+    )
 
 
 class FakeResponse:
     def __init__(self, body, url, status=200):
+        if not isinstance(body, str):
+            body = json.dumps(body)
         self._body, self.url, self.status = body, URL(url), status
 
     async def text(self):
@@ -25,7 +98,6 @@ class FakeResponse:
         return self._body.encode()
 
     async def json(self, content_type=None):
-        import json
         return json.loads(self._body)
 
     async def __aenter__(self):
@@ -65,131 +137,24 @@ def run(fn):
     return asyncio.run(fn())
 
 
-def test_cookie_lands_in_the_jar():
-    async def main():
-        session = FakeSession({})
-        TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        return {c.key for c in session.cookie_jar}
-    assert run(main) == {"SSESSabc"}
+def body_of(session, part):
+    """The JSON we sent to the first call whose URL contains ``part``."""
+    for method, url, kwargs in session.calls:
+        if part in url and kwargs.get("data"):
+            return json.loads(kwargs["data"])
+    raise AssertionError(f"no body sent to {part}")
 
 
-def test_planning_request_passes_only_supported_kwargs():
-    async def main():
-        session = FakeSession({("GET", "/club/87654321/reservations/20260910"): [
-            FakeResponse(PLANNING, "https://tenup.fft.fr/club/87654321/reservations/20260910")]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        planning = await client.async_get_planning(date(2026, 9, 10))
-        return planning, session.calls
-    planning, calls = run(main)
-    assert len(planning.courts) == 2
-    method, url, kwargs = calls[0]
-    assert method == "GET" and url.endswith("/reservations/20260910")
-    assert set(kwargs) <= {"headers", "data", "allow_redirects", "timeout"}, kwargs
+def client_for(routes, cookie="SHARED_SESSION_DRUPAL=abc"):
+    session = FakeSession(routes)
+    return TenupClient(session, cookie, "50690472", TZ), session
 
 
-def test_not_logged_in_raises_auth_error():
-    async def main():
-        body = PLANNING.replace("logged-in", "not-logged-in")
-        session = FakeSession({("GET", "/reservations/"): [FakeResponse(body, "https://tenup.fft.fr/club/87654321/reservations/20260910", 403)]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_get_planning(date(2026, 9, 10))
-    with pytest.raises(TenupAuthError):
-        run(main)
-
-
-def test_queue_it_is_passed_once_then_retried():
-    async def main():
-        session = FakeSession({
-            ("GET", "/reservations/"): [
-                FakeResponse("<html>queue</html>", "https://tenup.queue-it.net/?c=tenup"),
-                FakeResponse(PLANNING, "https://tenup.fft.fr/club/87654321/reservations/20260910"),
-            ],
-            ("POST", "queue-it.net/spa-api"): [FakeResponse('{"redirectUrl": "https://tenup.fft.fr/x?queueittoken=abc"}', "https://tenup.queue-it.net/spa-api")],
-            ("GET", "queueittoken=abc"): [FakeResponse("", "https://tenup.fft.fr/x")],
-        })
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        planning = await client.async_get_planning(date(2026, 9, 10))
-        return planning, session.calls
-    planning, calls = run(main)
-    assert len(planning.slots) == 7
-    assert calls[1][0] == "POST" and "spa-api" in calls[1][1]
-    assert len(calls) == 4
-
-
-def test_queue_it_that_never_opens_is_an_error():
-    async def main():
-        session = FakeSession({
-            ("GET", "/reservations/"): [FakeResponse("<html>queue</html>", "https://tenup.queue-it.net/?c=tenup")],
-            ("POST", "queue-it.net/spa-api"): [FakeResponse('{"redirectUrl": "https://tenup.fft.fr/x?queueittoken=abc"}', "https://tenup.queue-it.net/spa-api")],
-            ("GET", "queueittoken=abc"): [FakeResponse("", "https://tenup.fft.fr/x")],
-        })
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_get_planning(date(2026, 9, 10))
-    with pytest.raises(TenupConnectionError):
-        run(main)
-
-
-def test_required_players_reads_the_booking_form():
-    async def main():
-        detail = (FIXTURES / "detail.html").read_text(encoding="utf-8")
-        session = FakeSession({("GET", "/reservation_court_add/"): [
-            FakeResponse(detail, "https://tenup.fft.fr/club/reservation_court_add/nojs/21100/56152/1/2")]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        return await client.async_required_players("/club/reservation_court_add/nojs/21100/56152/1/2")
-    assert run(main) == 1  # detail.html fixture asks for 1 player
-
-
-def test_required_players_is_none_on_garbage():
-    async def main():
-        session = FakeSession({("GET", "/reservation_court_add/"): [
-            FakeResponse("<html><body class='logged-in'>nope</body></html>", "https://tenup.fft.fr/x")]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        return await client.async_required_players("/club/reservation_court_add/nojs/9/9/1/2")
-    assert run(main) is None
-
-
-QUEUE_BODY = ('<!doctype html><html><head>'
-              '<script src="https://static.queue-it.net/script/queueclient.min.js"></script>'
-              '</head><body><div>file d\'attente</div></body></html>')
-BOT_BODY = ('<!doctype html><html><head>'
-            '<script src="https://ct.captcha-delivery.com/c.js"></script>'
-            '</head><body><div id="datadome-captcha"></div></body></html>')
-
-
-@pytest.mark.parametrize("body, wall", [(QUEUE_BODY, "Queue-it"), (BOT_BODY, "bot challenge")])
-def test_an_interstitial_is_transient_not_an_expired_cookie(body, wall):
-    """Ten'Up serves these from its own host, so the queue-host check misses them.
-
-    They used to raise TenupAuthError, which HA turns into ConfigEntryAuthFailed:
-    the entry was torn down and a fresh cookie demanded although the session was
-    still perfectly valid.
-    """
-    async def main():
-        session = FakeSession({("GET", "/reservations/"): [
-            FakeResponse(body, "https://tenup.fft.fr/club/87654321/reservations/20260910")]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_get_planning(date(2026, 9, 10))
-
-    with pytest.raises(TenupConnectionError) as excinfo:
-        run(main)
-    assert wall in str(excinfo.value)
-    # and emphatically not the fatal one
-    assert not isinstance(excinfo.value, TenupAuthError)
-
-
-def test_a_signed_out_drupal_page_still_raises_auth_error():
-    """The one case that really does need a new cookie must keep working."""
-    async def main():
-        body = '<!doctype html><html><body class="html not-logged-in">Connexion</body></html>'
-        session = FakeSession({("GET", "/reservations/"): [
-            FakeResponse(body, "https://tenup.fft.fr/club/87654321/reservations/20260910")]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_get_planning(date(2026, 9, 10))
-    with pytest.raises(TenupAuthError):
-        run(main)
 
 
 REAL_NAME = "SSESS7ba44afc36c80c3faa2b8fa87e7742c5"
+SHARED_NAME = "SHARED_SESSION_DRUPAL"
+SHARED_VALUE = "aae6fe4e-0700-49d0-84ea-7b283f14affa"
 
 
 def test_session_cookie_reports_what_the_jar_holds():
@@ -259,94 +224,414 @@ def test_session_cookie_falls_back_to_ssess_without_a_shared_cookie():
     assert run(main) == f"{REAL_NAME}=legacy"
 
 
-# ---------------------------------------------------------------- cancellation
-CANCEL_PATH = "/club/reservation_court_delete/nojs/87654321/165841846/21100/2100"
-PLANNING_URL = "https://tenup.fft.fr/club/87654321/reservations/20260910"
-# What Ten'Up answered a successful cancellation with on 2026-09-14: no body
-# class at all, so nothing that says signed in or signed out.
-NOT_A_DRUPAL_PAGE = "<!doctype html><html><head></head><div>ok</div></html>"
-FREED = PLANNING.replace("adherent-reservation-calendrier-row-mine", "")
+# ------------------------------------------------------------------- planning
+def test_the_planning_is_asked_for_one_day_of_one_club():
+    def scenario():
+        client, session = client_for(
+            {
+                ("GET", "/profil"): [FakeResponse(PROFILE, "https://tenup.fft.fr/api/back/v1/profil")],
+                ("GET", "/clubs/reservations"): [
+                    FakeResponse(PLANNING, "https://tenup.fft.fr/api/back/v1/clubs/reservations")
+                ],
+            }
+        )
+        return client, session
+
+    async def go():
+        client, session = scenario()
+        planning = await client.async_get_planning(date(2026, 10, 16))
+        assert [c.name for c in planning.courts] == ["PLATRE 1"]
+        assert len(planning.free_slots) == 1
+        asked = [url for _m, url, _k in session.calls if "clubs/reservations" in url][0]
+        assert "date=2026-10-16" in asked and "codeClub=50690472" in asked
+
+    run(go)
 
 
-def _my_slot():
-    from custom_components.tenup.parser import parse_planning
+def test_who_we_are_is_fetched_once_and_kept():
+    """Every day of the grid needs it; asking again each time would be rude."""
+    async def go():
+        client, session = client_for(
+            {
+                ("GET", "/profil"): [FakeResponse(PROFILE, "https://tenup.fft.fr/api/back/v1/profil")],
+                ("GET", "/clubs/reservations"): [
+                    FakeResponse(PLANNING, "https://tenup.fft.fr/api/back/v1/clubs/reservations")
+                ],
+            }
+        )
+        await client.async_get_planning(date(2026, 10, 16))
+        await client.async_get_planning(date(2026, 10, 17))
+        assert len([url for _m, url, _k in session.calls if url.endswith("/profil")]) == 1
 
-    planning = parse_planning(PLANNING, date(2026, 9, 10), TZ)
-    return next(s for s in planning.slots if s.cancel_path)
-
-
-def _cancel_calls(session):
-    return [c for c in session.calls if "/reservation_court_delete/" in c[1]]
-
-
-def test_a_cancellation_is_judged_on_the_planning_not_on_the_answer_page():
-    """The answer page proved nothing and made a real cancellation look failed."""
-    async def main():
-        session = FakeSession({
-            ("GET", "/reservation_court_delete/"): [
-                FakeResponse(NOT_A_DRUPAL_PAGE, "https://tenup.fft.fr" + CANCEL_PATH)],
-            ("GET", "/reservations/20260910"): [FakeResponse(FREED, PLANNING_URL)],
-        })
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_cancel(_my_slot())
-        return session
-
-    session = run(main)
-    assert len(_cancel_calls(session)) == 1, "the cancel link is opened once, never retried"
+    run(go)
 
 
-def test_a_cancellation_the_planning_does_not_confirm_is_an_error():
-    async def main():
-        session = FakeSession({
-            ("GET", "/reservation_court_delete/"): [
-                FakeResponse(NOT_A_DRUPAL_PAGE, "https://tenup.fft.fr" + CANCEL_PATH)],
-            ("GET", "/reservations/20260910"): [FakeResponse(PLANNING, PLANNING_URL)],
-        })
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_cancel(_my_slot())
+def test_the_cookie_lands_in_the_jar():
+    async def go():
+        client, _ = client_for({})
+        assert any(m.key == "SHARED_SESSION_DRUPAL" for m in client.session.cookie_jar)
 
-    with pytest.raises(TenupBookingError):
-        run(main)
+    run(go)
 
 
-def test_a_cancellation_on_a_dead_session_still_asks_for_a_cookie():
-    """And the planning is not fetched: there is nothing to confirm."""
-    async def main():
-        body = '<!doctype html><html><body class="html not-logged-in">Connexion</body></html>'
-        session = FakeSession({("GET", "/reservation_court_delete/"): [
-            FakeResponse(body, "https://tenup.fft.fr" + CANCEL_PATH)]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_cancel(_my_slot())
+# ----------------------------------------------------------------------- auth
+@pytest.mark.parametrize("status", [401, 403])
+def test_a_refused_call_asks_for_a_new_cookie(status):
+    async def go():
+        client, _ = client_for(
+            {("GET", "/profil"): [FakeResponse({}, "https://tenup.fft.fr/api/back/v1/profil", status)]}
+        )
+        with pytest.raises(TenupAuthError):
+            await client.async_profile()
 
-    with pytest.raises(TenupAuthError):
-        run(main)
+    run(go)
+
+
+def test_the_sign_in_page_is_a_dead_cookie_too():
+    """Ten'Up answers HTML, not 401, when it decides to send us to sign in."""
+    async def go():
+        client, _ = client_for(
+            {
+                ("GET", "/profil"): [
+                    FakeResponse(
+                        "<!doctype html><html><body>Connexion</body></html>",
+                        "https://tenup.fft.fr/auth/signin?callbackUrl=%2Fprofil",
+                    )
+                ]
+            }
+        )
+        with pytest.raises(TenupAuthError):
+            await client.async_profile()
+
+    run(go)
+
+
+def test_a_wall_in_front_of_the_site_is_not_an_expired_session():
+    """A bot challenge proves nothing about the cookie; asking for a new one would be wrong."""
+    async def go():
+        client, _ = client_for(
+            {
+                ("GET", "/profil"): [
+                    FakeResponse(
+                        "<html><body>captcha-delivery</body></html>",
+                        "https://tenup.fft.fr/api/back/v1/profil",
+                    )
+                ]
+            }
+        )
+        with pytest.raises(TenupConnectionError):
+            await client.async_profile()
+
+    run(go)
+
+
+def test_a_server_error_is_never_a_cookie_problem():
+    async def go():
+        client, _ = client_for(
+            {("GET", "/profil"): [FakeResponse({}, "https://tenup.fft.fr/api/back/v1/profil", 503)]}
+        )
+        with pytest.raises(TenupConnectionError):
+            await client.async_profile()
+
+    run(go)
+
+
+def test_queue_it_is_passed_once_then_retried():
+    async def go():
+        client, session = client_for(
+            {
+                ("GET", "/profil"): [
+                    FakeResponse("file d'attente", "https://tenup.queue-it.net/?c=tenup"),
+                    FakeResponse(PROFILE, "https://tenup.fft.fr/api/back/v1/profil"),
+                ],
+                ("POST", "queue-it.net/spa-api"): [
+                    FakeResponse(
+                        {"redirectUrl": "https://tenup.fft.fr/?queueittoken=x"},
+                        "https://tenup.queue-it.net/spa-api",
+                    )
+                ],
+                ("GET", "queueittoken"): [
+                    FakeResponse("ok", "https://tenup.fft.fr/")
+                ],
+            }
+        )
+        assert (await client.async_profile())["id"] == ME
+        assert any("spa-api" in url for _m, url, _k in session.calls)
+
+    run(go)
+
+
+def test_a_waiting_room_that_never_opens_is_an_error():
+    async def go():
+        client, _ = client_for(
+            {
+                ("GET", "/profil"): [
+                    FakeResponse("file", "https://tenup.queue-it.net/?c=tenup"),
+                    FakeResponse("file", "https://tenup.queue-it.net/?c=tenup"),
+                ],
+                ("POST", "queue-it.net/spa-api"): [
+                    FakeResponse(
+                        {"redirectUrl": "https://tenup.fft.fr/?queueittoken=x"},
+                        "https://tenup.queue-it.net/spa-api",
+                    )
+                ],
+                ("GET", "queueittoken"): [FakeResponse("ok", "https://tenup.fft.fr/")],
+            }
+        )
+        with pytest.raises(TenupConnectionError):
+            await client.async_profile()
+
+    run(go)
+
+
+# ------------------------------------------------------------------- partners
+def test_a_partner_search_sends_one_word_and_the_club_code():
+    async def go():
+        client, session = client_for(
+            {
+                ("POST", "personnes/recherche"): [
+                    FakeResponse(
+                        {"total": 1, "hits": [{"idCrm": FRIEND, "nom": "ROE", "prenom": "Robin"}]},
+                        "https://tenup.fft.fr/api/back/v1/personnes/recherche/reservations-adherents",
+                    )
+                ]
+            }
+        )
+        found = await client.async_search_partner("Robin ROE")
+        assert [p.name for p in found] == ["Robin ROE"]
+        sent = body_of(session, "personnes/recherche")
+        assert sent == {"query": "robin", "codesClubs": ["50690472"], "from": 0, "size": 10}
+
+    run(go)
+
+
+def test_a_search_too_short_never_reaches_tenup():
+    async def go():
+        client, session = client_for({})
+        with pytest.raises(TenupBookingError):
+            await client.async_search_partner("ro")
+        assert session.calls == []
+
+    run(go)
+
+
+# -------------------------------------------------------------------- booking
+def booking_routes(mine, theirs=None, answer=None):
+    routes = {
+        ("GET", "/profil"): [FakeResponse(PROFILE, "https://tenup.fft.fr/api/back/v1/profil")],
+        ("POST", "reservations/eligibilite"): [
+            FakeResponse(mine, "https://tenup.fft.fr/api/back/v1/clubs/reservations/eligibilite")
+        ],
+        ("POST", "reservations/paiement"): [
+            FakeResponse(
+                answer if answer is not None else {"idReservation": 170000005},
+                "https://tenup.fft.fr/api/back/v1/clubs/reservations/paiement",
+            )
+        ],
+    }
+    if theirs is not None:
+        routes[("POST", "reservations/eligibilite")].append(
+            FakeResponse(theirs, "https://tenup.fft.fr/api/back/v1/clubs/reservations/eligibilite")
+        )
+    return routes
+
+
+def test_a_single_player_booking_sends_the_slot_and_our_subscription():
+    async def go():
+        client, session = client_for(booking_routes(eligibility(offer(11, "AB"))))
+        slot = free_slot()
+        assert "confirm" in (await client.async_book(slot)).lower()
+        sent = body_of(session, "reservations/paiement")
+        assert sent["codeClub"] == "50690472"
+        assert sent["idCreneau"] == 56132
+        assert sent["date"] == "2026-10-16"
+        assert sent["heureDebut"] == "20:00:00" and sent["heureFin"] == "21:00:00"
+        assert sent["personnes"] == [
+            {
+                "idCrm": ME,
+                "idAdhesion": 11,
+                "email": None,
+                "invite": False,
+                "ticketPayant": False,
+                "nomJoueurSaisi": None,
+            }
+        ]
+        assert slot.reservation_id == "170000005"
+
+    run(go)
+
+
+def test_a_booking_never_carries_a_price_nor_a_paid_ticket():
+    """The guard that matters: nothing we send may ever charge the user."""
+    async def go():
+        client, session = client_for(booking_routes(eligibility(offer(11, "AB"))))
+        await client.async_book(free_slot())
+        sent = body_of(session, "reservations/paiement")
+        assert sent["montant"] == 0
+        assert all(person["ticketPayant"] is False for person in sent["personnes"])
+        assert all(person["invite"] is False for person in sent["personnes"])
+        assert "urlPaiement" not in sent, "a free booking never opens a payment"
+
+    run(go)
+
+
+def test_a_ticket_book_is_never_picked_even_when_it_is_the_only_offer():
+    """Ten'Up offers it next to the subscription; taking it would spend a ticket."""
+    async def go():
+        client, session = client_for(booking_routes(eligibility(offer(22, "CA"))))
+        with pytest.raises(TenupBookingError, match="gratuite"):
+            await client.async_book(free_slot())
+        assert not any("paiement" in url for _m, url, _k in session.calls)
+
+    run(go)
+
+
+def test_the_reason_the_club_gives_is_relayed_when_no_offer_is_free():
+    async def go():
+        client, _ = client_for(
+            booking_routes(eligibility(offer(11, "AB", eligible=False, erreur="Quota atteint")))
+        )
+        with pytest.raises(TenupBookingError, match="Quota atteint"):
+            await client.async_book(free_slot())
+
+    run(go)
+
+
+def test_a_court_for_two_refuses_to_book_alone():
+    async def go():
+        client, session = client_for(booking_routes(eligibility(offer(11, "AB", players=2))))
+        with pytest.raises(TenupBookingError, match="2 joueurs"):
+            await client.async_book(free_slot())
+        assert not any("paiement" in url for _m, url, _k in session.calls)
+
+    run(go)
+
+
+def test_a_court_for_two_sends_both_players_on_their_own_subscription():
+    async def go():
+        client, session = client_for(
+            booking_routes(
+                eligibility(offer(11, "AB", players=2)),
+                theirs=eligibility(offer(33, "AB", players=2), id_crm=FRIEND),
+            )
+        )
+        partner = Partner(id_crm=FRIEND, last_name="ROE", first_name="Robin")
+        await client.async_book(free_slot(), partner)
+        sent = body_of(session, "reservations/paiement")
+        assert [p["idCrm"] for p in sent["personnes"]] == [ME, FRIEND]
+        assert [p["idAdhesion"] for p in sent["personnes"]] == [11, 33]
+
+    run(go)
+
+
+def test_the_partner_offers_are_asked_for_under_their_own_id():
+    async def go():
+        client, session = client_for(
+            booking_routes(
+                eligibility(offer(11, "AB", players=2)),
+                theirs=eligibility(offer(33, "AB", players=2), id_crm=FRIEND),
+            )
+        )
+        await client.async_book(
+            free_slot(), Partner(id_crm=FRIEND, last_name="ROE", first_name="Robin")
+        )
+        bodies = [
+            json.loads(kwargs["data"])
+            for _m, url, kwargs in session.calls
+            if "eligibilite" in url
+        ]
+        assert bodies[0] == {
+            "idCourt": 37195,
+            "codeClub": "50690472",
+            "date": "2026-10-16",
+            "heureDebut": "20:00:00",
+            "heureFin": "21:00:00",
+            "formulaire": True,
+        }
+        assert bodies[1]["idCrm"] == FRIEND and bodies[1]["formulaire"] is False
+
+    run(go)
+
+
+def test_a_partner_without_a_free_offer_stops_the_booking():
+    async def go():
+        client, session = client_for(
+            booking_routes(
+                eligibility(offer(11, "AB", players=2)),
+                theirs=eligibility(offer(44, "CA", players=2), id_crm=FRIEND),
+            )
+        )
+        with pytest.raises(TenupBookingError, match="Robin ROE"):
+            await client.async_book(
+                free_slot(), Partner(id_crm=FRIEND, last_name="ROE", first_name="Robin")
+            )
+        assert not any("paiement" in url for _m, url, _k in session.calls)
+
+    run(go)
 
 
 def test_a_refusal_stated_by_tenup_is_relayed():
-    async def main():
-        body = ('<!doctype html><html><body class="html logged-in">'
-                '<div class="messages error">Annulation impossible hors delai</div></body></html>')
-        session = FakeSession({("GET", "/reservation_court_delete/"): [
-            FakeResponse(body, "https://tenup.fft.fr" + CANCEL_PATH)]})
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_cancel(_my_slot())
+    async def go():
+        client, _ = client_for(
+            booking_routes(
+                eligibility(offer(11, "AB")),
+                answer={"errorMessage": "Vous avez déjà une réservation en cours"},
+            )
+        )
+        with pytest.raises(TenupBookingError, match="déjà une réservation"):
+            await client.async_book(free_slot())
 
-    with pytest.raises(TenupBookingError) as excinfo:
-        run(main)
-    assert "impossible" in str(excinfo.value)
+    run(go)
 
 
-def test_an_unconfirmed_cancellation_says_so():
-    """The link was opened: the user must not be told Ten'Up is simply down."""
-    async def main():
-        session = FakeSession({
-            ("GET", "/reservation_court_delete/"): [
-                FakeResponse(NOT_A_DRUPAL_PAGE, "https://tenup.fft.fr" + CANCEL_PATH)],
-            ("GET", "/reservations/20260910"): [FakeResponse(QUEUE_BODY, PLANNING_URL)],
-        })
-        client = TenupClient(session, "SSESSabc=xyz", "87654321", TZ)
-        await client.async_cancel(_my_slot())
+# ---------------------------------------------------------------- cancelling
+def test_a_cancellation_deletes_the_reservation_by_id():
+    async def go():
+        client, session = client_for(
+            {("DELETE", "/reservations/"): [FakeResponse("", "https://tenup.fft.fr/api/back/v1/reservations/170000005", 204)]}
+        )
+        slot = free_slot()
+        slot.reservation_id = "170000005"
+        await client.async_cancel(slot)
+        assert session.calls[0][0] == "DELETE"
+        assert session.calls[0][1].endswith("/reservations/170000005")
 
-    with pytest.raises(TenupConnectionError) as excinfo:
-        run(main)
-    assert "non confirmée" in str(excinfo.value)
+    run(go)
+
+
+def test_a_cancellation_without_a_reservation_never_calls_tenup():
+    async def go():
+        client, session = client_for({})
+        with pytest.raises(TenupBookingError):
+            await client.async_cancel(free_slot())
+        assert session.calls == []
+
+    run(go)
+
+
+def test_a_cancellation_on_a_dead_session_still_asks_for_a_cookie():
+    async def go():
+        client, _ = client_for(
+            {("DELETE", "/reservations/"): [FakeResponse({}, "https://tenup.fft.fr/api/back/v1/reservations/1", 401)]}
+        )
+        slot = free_slot()
+        slot.reservation_id = "1"
+        with pytest.raises(TenupAuthError):
+            await client.async_cancel(slot)
+
+    run(go)
+
+
+def test_required_players_swallows_a_hiccup():
+    """It only decorates the grid: a failure must never fail the refresh."""
+    async def go():
+        client, _ = client_for(
+            {
+                ("POST", "reservations/eligibilite"): [
+                    FakeResponse({}, "https://tenup.fft.fr/api/back/v1/clubs/reservations/eligibilite", 503)
+                ]
+            }
+        )
+        assert await client.async_required_players(free_slot()) is None
+
+    run(go)

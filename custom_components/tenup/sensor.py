@@ -18,7 +18,7 @@ from homeassistant.util import dt as dt_util
 
 from .coordinator import TenupCoordinator, TenupData
 from .entity import TenupEntity
-from .parser import Slot
+from .models import Slot
 
 MAX_LISTED_SLOTS = 40
 

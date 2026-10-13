@@ -25,7 +25,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry) -> dict
                 "free": len(p.free_slots),
                 "mine": len(p.my_slots),
                 "total": len(p.slots),
-                "logged_in": p.logged_in,
+                "window_end": p.window_end.isoformat() if p.window_end else None,
             }
             for day, p in sorted(data.plannings.items())
         },

@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 
 from .api import TenupError
 from .const import CONF_FRIENDS, DOMAIN
+from .models import partner_choice
 
 
 @callback
@@ -90,7 +91,12 @@ async def ws_search_partner(
         return
     connection.send_result(
         msg["id"],
-        {"results": [{"choice": choice, "name": name} for choice, name in results]},
+        {
+            "results": [
+                {"choice": partner_choice(found), "name": found.name}
+                for found in results
+            ]
+        },
     )
 
 

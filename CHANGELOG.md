@@ -1,5 +1,46 @@
 # Changelog
 
+## 2.0.0
+
+### Ten'Up rebuilt its member area, and this follows it
+
+The FFT replaced the Drupal site with a new one on 13 October 2026, overnight.
+Every address the integration used answers 404, the reservation grid is no
+longer HTML to read, and the day no longer travels in the URL. Nothing short of
+a new client could keep working.
+
+It now speaks to the JSON API the new site uses, which is both sturdier and
+plainer: one call returns a day of courts with their slots, who booked them and
+whether the booking can still be cancelled. The HTML parser is gone, and with it
+the whole business of reading a page meant for a browser.
+
+Nothing changes for you. The cookie kept its name, so the bookmarklet still
+works and an existing setup carries on without being touched. The card, the
+sensors, the calendar, the services and the friends list are unchanged.
+
+### A booking may never cost you anything
+
+Ten'Up offers a slot through several "offers": a subscription, a ticket book, or
+a ticket bought online. Only the subscription is free, and the integration now
+refuses to book with anything else, for you and for the partner you name.
+
+The old guard looked at the announced price, which no longer tells them apart:
+the new API quotes the club's ticket rate on the subscription as well. It is the
+kind of offer that decides now, never the figure next to it.
+
+### The card shows your next booking
+
+A band above the grid says when you play next, which court, and opens that day
+when tapped. It covers every day Ten'Up returned, not only the days the grid
+shows, and it ignores the court filter: it is your booking, wherever it is. Turn
+it off with "Show your next booking above the grid" in the card editor.
+
+### Verification
+
+134 Python tests and 214 card assertions. The whole path was walked against the
+real site, booked and cancelled: a court for one player, a court for two with a
+club member named by hand, and the cancellation of both.
+
 ## 1.2.0
 
 ### The entry reloads itself, once

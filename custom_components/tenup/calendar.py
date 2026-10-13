@@ -11,7 +11,7 @@ from homeassistant.util import dt as dt_util
 
 from .coordinator import TenupCoordinator
 from .entity import TenupEntity
-from .parser import Slot
+from .models import Slot
 
 
 def _event(slot: Slot, club_name: str) -> CalendarEvent:

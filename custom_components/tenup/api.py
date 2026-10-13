@@ -1,4 +1,10 @@
-"""HTTP client for the Ten'Up member area."""
+"""HTTP client for the Ten'Up member area.
+
+Ten'Up serves that area as a JSON API behind the browser session cookie, so
+everything here is one of two things: carrying that cookie faithfully (and
+through the waiting room Ten'Up puts in front of its site), and turning the
+answers into the dataclasses of :mod:`models`.
+"""
 
 from __future__ import annotations
 
@@ -9,28 +15,22 @@ import re
 from datetime import date, datetime
 from http.cookies import SimpleCookie
 from typing import Any
-from urllib.parse import quote, urlencode, urljoin, urlsplit
+from urllib.parse import urlencode
 
 import aiohttp
 from yarl import URL
 
-from .const import BASE_URL, PUBLIC_API, QUEUE_ENQUEUE_URL, QUEUE_HOST, SLOT_MINE, USER_AGENT
-from .parser import (
-    BookingForm,
+from .const import API, BASE_URL, QUEUE_ENQUEUE_URL, QUEUE_HOST, USER_AGENT
+from .models import (
+    Eligibility,
+    Partner,
     Planning,
     Slot,
     TenupParseError,
-    extract_drupal_settings,
-    free_formulas,
-    interstitial_reason,
-    is_logged_in,
-    looks_signed_out,
-    parse_booking_form,
-    parse_formules_response,
-    parse_messages,
-    parse_partner_results,
-    parse_planning,
+    eligibility_from_json,
     partner_search_term,
+    partners_from_json,
+    planning_from_json,
     resolve_partner,
 )
 
@@ -160,51 +160,6 @@ def new_session() -> aiohttp.ClientSession:
     return aiohttp.ClientSession(cookie_jar=new_cookie_jar())
 
 
-# What RechercheJoueurAutocomplete actually calls: it ignores the
-# autocomplete_path the page advertises and hardcodes this one.
-JOUEUR_AUTOCOMPLETE_PATH = "/club/autocomplete/partenaire"
-
-
-_PARTNER_CHOICE_RE = re.compile(r"^(?P<name>.+?)\s*\((?P<ident>\d+)\)\s*$")
-
-
-def parse_partner_choice(label: str) -> tuple[str, str] | None:
-    """Split an autocomplete key: 'John DOE (111111111)' -> name + Ten'Up member id.
-
-    The autocomplete answers {key: display}, and the key is what the field
-    submits, so it carries the identifier that tells two homonyms apart.
-    """
-    match = _PARTNER_CHOICE_RE.match(label.strip())
-    if match is None:
-        return None
-    return match.group("name").strip(), match.group("ident")
-
-
-def formule_ajax_payload(
-    ajax_params: dict[str, Any], user_id: str, current_formule: str = ""
-) -> dict[str, str]:
-    """The body fetchUserFormule sends, verbatim.
-
-    postParams = {userId, currentFormule} merged with params_formule_joueur_ajax,
-    then url is removed and used as the address. qs.stringify renders booleans
-    as true/false, so match that rather than Python's True/False.
-    """
-    payload: dict[str, str] = {
-        "userId": str(user_id),
-        "currentFormule": str(current_formule or ""),
-    }
-    for key, value in ajax_params.items():
-        if key == "url" or value is None:
-            continue
-        if value is True:
-            payload[key] = "true"
-        elif value is False:
-            payload[key] = "false"
-        else:
-            payload[key] = str(value)
-    return payload
-
-
 class TenupClient:
     """Talk to tenup.fft.fr with a user-provided session cookie.
 
@@ -223,6 +178,7 @@ class TenupClient:
         self._club_code = str(club_code)
         self._tzinfo = tzinfo
         self._queue_lock = asyncio.Lock()
+        self._me: int | None = None
         self._jar = session.cookie_jar
         self.set_cookie(cookie)
 
@@ -338,209 +294,261 @@ class TenupClient:
             except (aiohttp.ClientError, asyncio.TimeoutError) as err:
                 raise TenupConnectionError(f"Queue-it: {err}") from err
 
-    async def _get_html(self, path: str) -> tuple[str, URL]:
+
+    # --------------------------------------------------------------- API calls
+    async def _api(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+        payload: Any = None,
+    ) -> Any:
+        """One call to the member API, with its two ways of saying "signed out".
+
+        A dead cookie earns a 401 on the API, but Ten'Up also answers its own
+        sign-in page to a request it will not serve, and that page is HTML. Both
+        mean the same thing to us, and nothing else does: a waiting room or a bot
+        challenge must never be read as an expired session, or the user is asked
+        for a new cookie for nothing.
+        """
+        url = f"{API}{path}"
+        if params:
+            url = f"{url}?{urlencode(params)}"
+        headers = dict(_JSON_HEADERS)
+        data: str | None = None
+        if payload is not None:
+            headers["Content-Type"] = "application/json"
+            data = json.dumps(payload)
+
         body, final_url, status = await self._request(
-            "GET", urljoin(BASE_URL, path), headers=_HTML_HEADERS
+            method, url, headers=headers, data=data
         )
+
+        answer: Any = None
+        if body.strip():
+            try:
+                answer = json.loads(body)
+            except ValueError:
+                answer = None
+
+        if status in (401, 403) or (answer is None and "/auth/signin" in str(final_url)):
+            raise TenupAuthError("Ten'Up session is not logged in (cookie expired?)")
         if status >= 500:
             raise TenupConnectionError(f"Ten'Up answered {status} on {path}")
-        if is_logged_in(body):
-            return body, final_url
-        # Only a Drupal page that says so proves the cookie is dead. Ten'Up also
-        # answers ordinary requests with a Queue-it waiting room or a bot
-        # challenge, and treating those as an expired session tore the entry
-        # down and made the user paste a new cookie for nothing.
-        if looks_signed_out(body):
-            raise TenupAuthError("Ten'Up session is not logged in (cookie expired?)")
-        raise TenupConnectionError(
-            f"Ten'Up answered with {interstitial_reason(body, str(final_url))} on {path}"
-        )
+        if status >= 400:
+            message = ""
+            if isinstance(answer, dict):
+                message = str(answer.get("errorMessage") or answer.get("message") or "")
+            if message:
+                raise TenupBookingError(message)
+            raise TenupConnectionError(f"Ten'Up answered {status} on {path}")
+        if answer is None and body.strip():
+            raise TenupConnectionError(f"Ten'Up answered no JSON on {path}")
+        return answer
+
+    # ------------------------------------------------------------------ profile
+    async def async_profile(self) -> dict[str, Any]:
+        """The signed-in member. Also the only way to recognise our own bookings."""
+        answer = await self._api("GET", "/profil")
+        if not isinstance(answer, dict):
+            raise TenupConnectionError("Ten'Up answered no profile")
+        return answer
+
+    async def async_me(self) -> int | None:
+        """Our own member id, fetched once and kept.
+
+        The grid names the players of a reservation by ``idCrm``; the profile
+        calls the same number ``id``. Comparing the two is what tells our own
+        bookings from everybody else's.
+        """
+        if self._me is None:
+            profile = await self.async_profile()
+            raw = profile.get("id")
+            self._me = int(raw) if raw is not None else None
+        return self._me
 
     # ----------------------------------------------------------------- planning
     async def async_get_planning(self, day: date) -> Planning:
         """The reservation grid of ``day``."""
-        path = f"/club/{self._club_code}/reservations/{day:%Y%m%d}"
-        body, _ = await self._get_html(path)
-        planning = parse_planning(body, day, self._tzinfo)
-        if not planning.slots and "Accès refusé" in body:
-            raise TenupAuthError("Ten'Up refused access to the club planning")
-        return planning
+        me = await self.async_me()
+        answer = await self._api(
+            "GET",
+            "/clubs/reservations",
+            params={"date": day.isoformat(), "codeClub": self._club_code},
+        )
+        try:
+            return planning_from_json(answer, day, self._tzinfo, me)
+        except TenupParseError as err:
+            raise TenupConnectionError(f"Unexpected planning for {day}: {err}") from err
 
     async def async_validate(self) -> Planning:
         """Fetch today's planning; raises TenupAuthError on a bad cookie."""
         return await self.async_get_planning(datetime.now(self._tzinfo).date())
 
-    # ------------------------------------------------------------------ booking
-    async def async_get_booking_form(self, slot: Slot) -> BookingForm:
-        """Open the reservation detail page of a free slot."""
-        if not slot.book_path:
-            raise TenupBookingError("This slot has no booking link (not free)")
-        body, final_url = await self._get_html(slot.book_path)
+    async def async_my_reservations(self) -> list[dict[str, Any]]:
+        """Our own reservations, club by club, as Ten'Up lists them."""
+        answer = await self._api("GET", "/profil/reservations")
+        return answer if isinstance(answer, list) else []
+
+    # -------------------------------------------------------------- eligibility
+    async def async_eligibility(
+        self, slot: Slot, id_crm: int | None = None
+    ) -> Eligibility:
+        """What one player may do on one slot.
+
+        Without ``id_crm`` this answers for the signed-in member and carries the
+        form; with it, for the partner about to be named, which is how their own
+        offers are read.
+        """
+        payload: dict[str, Any] = {
+            "idCourt": int(slot.court_id),
+            "codeClub": self._club_code,
+            "date": slot.start.date().isoformat(),
+            "heureDebut": slot.hhmmss,
+            "heureFin": slot.end_hhmmss,
+            "formulaire": id_crm is None,
+        }
+        if id_crm is not None:
+            payload["idCrm"] = int(id_crm)
+        answer = await self._api(
+            "POST", "/clubs/reservations/eligibilite", payload=payload
+        )
         try:
-            return parse_booking_form(body)
+            return eligibility_from_json(answer)
         except TenupParseError as err:
-            messages = parse_messages(body)
-            if messages:
-                raise TenupBookingError(" ".join(messages)) from err
-            raise TenupConnectionError(
-                f"Unexpected reservation detail page at {final_url.path}: {err}"
-            ) from err
+            raise TenupConnectionError(f"Unexpected eligibility: {err}") from err
 
-    async def async_required_players(self, book_path: str) -> int | None:
-        """Best-effort: how many players a slot's booking configuration requires.
+    async def async_required_players(self, slot: Slot) -> int | None:
+        """Best-effort: how many players this slot configuration demands.
 
-        Returns None when it can't be determined (parse/connection hiccup); the
-        caller caches the result per idCreneau so this runs at most once per config.
+        Returns None on a hiccup; the caller caches the answer per idCreneau, so
+        this runs at most once per slot configuration.
         """
         try:
-            body, _ = await self._get_html(book_path)
-            return parse_booking_form(body).required_players
-        except (TenupParseError, TenupError):
+            return (await self.async_eligibility(slot)).required_players
+        except TenupError:
             return None
 
-    async def async_search_partner(self, query: str) -> list[tuple[str, str]]:
+    # ------------------------------------------------------------------ partner
+    async def async_search_partner(self, query: str) -> list[Partner]:
         """Search a club member to play with, the way the site's own field does."""
         wanted = " ".join(query.split())
         if len(wanted) < 3:
-            raise TenupBookingError("Indiquez au moins 3 caracteres pour chercher un partenaire")
-        # Ten'Up searches ONE word: "Do eric" answers nothing at all, while
-        # "Do" answers both DOE. So send a single term, then narrow the
+            raise TenupBookingError(
+                "Indiquez au moins 3 caracteres pour chercher un partenaire"
+            )
+        # Ten'Up searches one word: "Jean Dupont" answers nothing at all, while
+        # "Dupont" answers every Dupont. So send a single term, then narrow the
         # answer with everything that was typed.
-        term = partner_search_term(wanted)
-        text, _final, status = await self._request(
-            "GET",
-            f"{BASE_URL}{JOUEUR_AUTOCOMPLETE_PATH}/{quote(term, safe='')}",
-            headers=_JSON_HEADERS,
+        answer = await self._api(
+            "POST",
+            "/personnes/recherche/reservations-adherents",
+            payload={
+                "query": partner_search_term(wanted),
+                "codesClubs": [self._club_code],
+                "from": 0,
+                "size": 10,
+            },
         )
-        if status >= 500:
-            raise TenupConnectionError(f"Ten'Up answered {status} on the partner search")
-        results = parse_partner_results(text)
+        results = partners_from_json(answer)
         if len(wanted.split()) > 1:
             # Keep the wider list when nothing matches, rather than show nothing.
             return resolve_partner(results, wanted) or results
         return results
 
-    async def async_partner_formulas(
-        self, book_path: str, user_id: str
-    ) -> list[dict[str, Any]]:
-        """Formulas Ten'Up opens to that partner, paid ones removed."""
-        body, _ = await self._get_html(book_path)
-        settings = extract_drupal_settings(body)
-        params = (settings.get("reservation_detail") or {}).get(
-            "params_formule_joueur_ajax"
-        ) or {}
-        text, _final, status = await self._request(
-            "POST",
-            f"{BASE_URL}/club/reservations/formule/ajax",
-            headers={
-                **_JSON_HEADERS,
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Origin": BASE_URL,
-                "Referer": urljoin(BASE_URL, book_path),
-                "X-Requested-With": "XMLHttpRequest",
-            },
-            data=formule_ajax_payload(params, user_id),
-        )
-        if status >= 500:
-            raise TenupConnectionError(f"Ten'Up answered {status} on formule/ajax")
-        return free_formulas(parse_formules_response(text))
+    # ------------------------------------------------------------------ booking
+    def _person(self, id_crm: int, offer_id: int) -> dict[str, Any]:
+        """One line of the booking payload.
 
-    async def async_book(
-        self,
-        slot: Slot,
-        partner_choice: str | None = None,
-        partner_formula: str | None = None,
-    ) -> str:
-        """Book a free slot. Returns the confirmation text.
-
-        A slot that demands two players needs partner_choice, the autocomplete
-        key that carries the Ten'Up member id.
+        ``invite``, ``email`` and ``nomJoueurSaisi`` belong to the outsider path,
+        where a non-member is named by hand and somebody pays for them. We never
+        take it, so they stay empty and ``ticketPayant`` stays false.
         """
-        form = await self.async_get_booking_form(slot)
-        if form.required_players > 1 and not partner_choice:
+        return {
+            "idCrm": int(id_crm),
+            "idAdhesion": int(offer_id),
+            "email": None,
+            "invite": False,
+            "ticketPayant": False,
+            "nomJoueurSaisi": None,
+        }
+
+    async def async_book(self, slot: Slot, partner: Partner | None = None) -> str:
+        """Book a free slot, on a subscription and for nothing.
+
+        A slot the club wants two players on needs ``partner``: a club member,
+        who brings their own subscription. Should either player have no free
+        offer, we stop rather than spend a ticket or open a payment.
+        """
+        if not slot.creneau_id:
+            raise TenupBookingError("Ce créneau n'a pas d'identifiant réservable")
+
+        mine = await self.async_eligibility(slot)
+        required = mine.required_players
+        if required > 1 and partner is None:
             raise TenupBookingError(
-                f"Ce créneau demande {form.required_players} joueurs; "
-                "indiquez un partenaire"
+                f"Ce créneau demande {required} joueurs; indiquez un partenaire"
             )
-        if partner_choice:
-            form.partner_choice = partner_choice
-            form.partner_formula = partner_formula
-        body, final_url, status = await self._request(
+
+        me = await self.async_me()
+        if me is None:
+            raise TenupBookingError("Ten'Up n'a pas dit qui nous sommes")
+        people = [self._person(me, self._free_offer(mine, "vous").id)]
+
+        if required > 1 and partner is not None:
+            theirs = await self.async_eligibility(slot, partner.id_crm)
+            people.append(
+                self._person(partner.id_crm, self._free_offer(theirs, partner.name).id)
+            )
+
+        answer = await self._api(
             "POST",
-            f"{BASE_URL}/club/reservations/detail/submit",
-            headers={
-                **_HTML_HEADERS,
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Origin": BASE_URL,
-                "Referer": urljoin(BASE_URL, slot.book_path or "/"),
+            "/clubs/reservations/paiement",
+            payload={
+                "codeClub": self._club_code,
+                "idCreneau": int(slot.creneau_id),
+                "date": slot.start.date().isoformat(),
+                "heureDebut": slot.hhmmss,
+                "heureFin": slot.end_hhmmss,
+                "montant": 0,
+                "reserverCreneauSuivant": False,
+                "updateInfosPerso": False,
+                "urlRetour": (
+                    f"{BASE_URL}/paiement/confirmation/club-reservation"
+                    f"?codeClub={self._club_code}"
+                ),
+                "personnes": people,
             },
-            data=form.as_post_data(),
         )
-        if status >= 500:
-            raise TenupConnectionError(f"Ten'Up answered {status} on booking submit")
-        if not is_logged_in(body):
-            raise TenupAuthError("Session lost while booking")
-        if "/club/reservations/confirmation" in final_url.path:
-            return "Votre réservation est confirmée."
-        messages = parse_messages(body)
-        raise TenupBookingError(
-            " ".join(messages) if messages else f"Ten'Up did not confirm (landed on {final_url.path})"
-        )
+        if isinstance(answer, dict):
+            if answer.get("errorMessage"):
+                raise TenupBookingError(str(answer["errorMessage"]))
+            if answer.get("idReservation"):
+                slot.reservation_id = str(answer["idReservation"])
+        return "Votre réservation est confirmée."
+
+    @staticmethod
+    def _free_offer(eligibility: Eligibility, who: str) -> Any:
+        """The subscription of one player, or a refusal naming them.
+
+        This is the guard that keeps a booking free: the ticket book and the
+        single ticket are offers like any other in the answer, and picking one
+        would spend the user's money without them asking.
+        """
+        offer = eligibility.free_offer
+        if offer is None:
+            refused = next(
+                (o.error for o in eligibility.offers if o.error), None
+            )
+            raise TenupBookingError(
+                f"Aucune formule gratuite pour {who}"
+                + (f" : {refused}" if refused else "")
+            )
+        return offer
 
     async def async_cancel(self, slot: Slot) -> None:
-        """Cancel one of the account owner's reservations (a plain GET on Ten'Up).
-
-        The page Ten'Up answers a cancellation with is not a signed-in Drupal
-        page. Measured on 2026-09-14 it carried no body class at all, so going
-        through _get_html reported a failure while the booking was already gone,
-        and the user clicked a second time. That page cannot tell success from
-        failure; the planning of the day can, so the result is judged there.
-        """
-        if not slot.cancel_path:
-            raise TenupBookingError("This slot has no cancellation link (not yours)")
-        body, _, status = await self._request(
-            "GET", urljoin(BASE_URL, slot.cancel_path), headers=_HTML_HEADERS
-        )
-        if status >= 500:
-            raise TenupConnectionError(f"Ten'Up answered {status} on {slot.cancel_path}")
-        if looks_signed_out(body):
-            raise TenupAuthError("Ten'Up session is not logged in (cookie expired?)")
-        messages = parse_messages(body)
-        errors = [m for m in messages if "impossible" in m.lower() or "erreur" in m.lower()]
-        if errors:
-            raise TenupBookingError(" ".join(errors))
-        day = slot.start.astimezone(self._tzinfo).date()
-        try:
-            planning = await self.async_get_planning(day)
-        except TenupConnectionError as err:
-            raise TenupConnectionError(
-                f"annulation envoyée mais non confirmée, vérifiez le planning ({err})"
-            ) from err
-        still = planning.find(slot.court_id, slot.start)
-        if still is not None and still.state == SLOT_MINE:
-            raise TenupBookingError("Ten'Up a conservé la réservation, elle n'est pas annulée")
-
-    # --------------------------------------------------------------- public API
-    @staticmethod
-    async def async_search_clubs(
-        session: aiohttp.ClientSession, query: str, practice: str = "TENNIS"
-    ) -> list[dict[str, Any]]:
-        """Public club search (no authentication)."""
-        payload = {"query": query, "pratique": practice, "from": 0, "size": 10}
-        try:
-            async with session.post(
-                f"{PUBLIC_API}/clubs/recherche",
-                json=payload,
-                headers=_JSON_HEADERS,
-                timeout=_TIMEOUT,
-            ) as resp:
-                if resp.status != 200:
-                    raise TenupConnectionError(f"club search answered {resp.status}")
-                data = await resp.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            raise TenupConnectionError(f"club search: {err}") from err
-        return list(data.get("clubs") or [])
-
-    @staticmethod
-    def host_of(url: str) -> str:
-        return urlsplit(url).netloc
+        """Cancel one of our own reservations."""
+        if not slot.reservation_id:
+            raise TenupBookingError("Ce créneau n'a pas de réservation à annuler")
+        await self._api("DELETE", f"/reservations/{slot.reservation_id}")

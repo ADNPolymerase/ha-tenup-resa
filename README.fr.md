@@ -88,6 +88,7 @@ days: 3
 | `days` | `3` | Onglets de jours, 1 à 7 |
 | `start_hour`, `end_hour` | grille du club | Heures affichées |
 | `courts` | tous | Courts affichés |
+| `next_booking` | `true` | Annoncer votre prochaine réservation au-dessus de la grille |
 | `show_names` | `true` | Afficher qui a réservé. Désactivé : ni noms, ni suivi depuis la grille |
 | `confirm` | `true` | Confirmer avant de réserver ou d'annuler |
 | `compact` | `false` | Cellules plus petites |
@@ -116,12 +117,12 @@ data:
 ```yaml
 service: tenup.cancel
 data:
-  reservation_id: "165841846"   # ou court_id + start
+  reservation_id: "123456789"   # ou court_id + start
 ```
 
 Les deux services renvoient une réponse (`response_variable`) et lèvent une erreur lisible quand Ten'Up refuse (par exemple la règle du club sur les réservations simultanées).
 
-Les courts qui demandent deux joueurs sont réservables également. Indiquez `partner` avec un nom : l'intégration cherche parmi les adhérents du club, refuse de trancher entre homonymes et vous demande alors le prénom, puis choisit une formule gratuite. Une option payante n'est jamais sélectionnée.
+Les courts qui demandent deux joueurs sont réservables également. Indiquez `partner` avec un nom : l'intégration cherche parmi les adhérents du club, refuse de trancher entre homonymes et vous demande alors le prénom, puis choisit son abonnement. Un carnet de tickets ou un ticket à l'unité n'est jamais sélectionné : seul un abonnement ne coûte rien, et Ten'Up affiche le tarif d'un ticket du club sur l'abonnement aussi, donc c'est la nature de la formule qui décide, jamais le prix annoncé.
 
 ## À savoir
 

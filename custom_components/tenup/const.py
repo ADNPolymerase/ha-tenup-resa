@@ -7,6 +7,9 @@ from datetime import timedelta
 DOMAIN = "tenup"
 
 BASE_URL = "https://tenup.fft.fr"
+# The member area runs on its own JSON API, authenticated by the session cookie
+# alone. The public one, which needs no session, still answers the club search.
+API = f"{BASE_URL}/api/back/v1"
 PUBLIC_API = f"{BASE_URL}/back/public/v1"
 QUEUE_ENQUEUE_URL = "https://tenup.queue-it.net/spa-api/queue/tenup/tenupprod/enqueue?cid=fr-FR"
 QUEUE_HOST = "queue-it.net"
@@ -26,9 +29,15 @@ DEFAULT_DAYS_AHEAD = 7
 DEFAULT_SCAN_INTERVAL = timedelta(minutes=15)
 MIN_SCAN_INTERVAL_MINUTES = 5
 
-# Best-effort per-refresh cap on booking-form fetches used to learn how many
+# Best-effort per-refresh cap on eligibility calls used to learn how many
 # players each distinct slot configuration (idCreneau) requires. Cached after.
 MAX_PLAYER_LOOKUPS = 80
+
+# The only offer that costs nothing: a subscription. A ticket book ("CA") debits
+# a ticket and a single ticket is bought online, so neither is ever picked for
+# the user. Ten'Up quotes the club's ticket rate on every offer, subscription
+# included, so the price field cannot be used to tell them apart.
+OFFER_SUBSCRIPTION = "AB"
 
 SERVICE_BOOK = "book"
 SERVICE_CANCEL = "cancel"

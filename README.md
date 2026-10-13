@@ -88,6 +88,7 @@ days: 3
 | `days` | `3` | Day tabs, 1 to 7 |
 | `start_hour`, `end_hour` | club grid | Hours shown |
 | `courts` | all | Courts shown |
+| `next_booking` | `true` | Announce your next booking above the grid |
 | `show_names` | `true` | Show who booked. Off: no names, no following from the grid |
 | `confirm` | `true` | Ask before booking or cancelling |
 | `compact` | `false` | Smaller cells |
@@ -116,12 +117,12 @@ data:
 ```yaml
 service: tenup.cancel
 data:
-  reservation_id: "165841846"   # or court_id + start
+  reservation_id: "123456789"   # or court_id + start
 ```
 
 Both services return a response (`response_variable`) and raise a readable error when Ten'Up refuses (for example the club rule on simultaneous reservations).
 
-Courts that require two players are bookable too. Pass `partner` with a name: the integration searches the club members, refuses to choose between namesakes and asks you to give the first name, then picks a formula that costs nothing. A paid option is never selected.
+Courts that require two players are bookable too. Pass `partner` with a name: the integration searches the club members, refuses to choose between namesakes and asks you to give the first name, then picks their subscription. A ticket book or a single ticket is never selected: only a subscription is free, and Ten'Up quotes the club's ticket rate on the subscription as well, so the kind of offer decides, never the figure next to it.
 
 ## Notes
 
