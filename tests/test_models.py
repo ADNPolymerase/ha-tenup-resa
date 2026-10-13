@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from custom_components.tenup.const import SLOT_BUSY, SLOT_FREE, SLOT_MINE
+from custom_components.tenup.const import SLOT_BUSY, SLOT_CLOSED, SLOT_FREE, SLOT_MINE
 from custom_components.tenup.models import (
     Offer,
     Partner,
@@ -142,10 +142,19 @@ def test_a_slot_is_free_booked_or_ours():
     assert theirs.cancellable is False, "only our own bookings may be cancelled"
 
 
-def test_a_closed_slot_is_not_shown_at_all():
-    """Ten'Up keeps sending the cell; a slot nobody can take is not a slot."""
+def test_a_slot_nobody_can_take_is_kept_rather_than_dropped():
+    """A 90-minute lesson leaves half an hour behind, too short to book.
+
+    Ten'Up draws that band hatched. Dropping it left a hole in the grid, which
+    reads as a bug rather than as "nothing to take here".
+    """
     planning = read()
-    assert "21099_11:00:00" not in {f"{s.court_id}_{s.hhmmss}" for s in planning.slots}
+    by_key = {f"{s.court_id}_{s.hhmmss}": s for s in planning.slots}
+    closed = by_key["21099_11:00:00"]
+    assert closed.state == SLOT_CLOSED
+    assert closed.reservation_id is None and closed.label is None
+    assert closed not in planning.free_slots, "it is not bookable"
+    assert closed not in planning.my_slots
 
 
 def test_a_booking_that_is_not_ours_is_never_cancellable_even_when_tenup_says_so():

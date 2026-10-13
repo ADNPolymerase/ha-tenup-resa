@@ -49,6 +49,10 @@ ATTR_RESERVATION_ID = "reservation_id"
 
 # Slot states
 SLOT_FREE = "free"
+# A cell Ten'Up shows but nobody can take: the half hour a 90-minute lesson
+# leaves behind, too short to book. Kept rather than dropped, or the grid would
+# show a hole where the site shows hatching.
+SLOT_CLOSED = "closed"
 SLOT_BUSY = "busy"
 SLOT_MINE = "mine"
 SLOT_PAST = "past"

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import Any
 
-from .const import OFFER_SUBSCRIPTION, SLOT_BUSY, SLOT_FREE, SLOT_MINE
+from .const import OFFER_SUBSCRIPTION, SLOT_BUSY, SLOT_CLOSED, SLOT_FREE, SLOT_MINE
 
 
 class TenupParseError(Exception):
@@ -295,16 +295,16 @@ def planning_from_json(
                     )
                 )
                 continue
-            if not raw_slot.get("reservable"):
-                # Closed, out of the booking window, or kept by the club.
-                continue
             planning.slots.append(
                 Slot(
                     court_id=court.id,
                     court_name=court.name,
                     start=start,
                     end=end,
-                    state=SLOT_FREE,
+                    # Not bookable and not booked: the leftover half hour of a
+                    # 90-minute lesson, or a band the club keeps. Ten'Up hatches
+                    # it; dropping it would leave a hole in the grid instead.
+                    state=SLOT_FREE if raw_slot.get("reservable") else SLOT_CLOSED,
                     creneau_id=str(raw_slot["id"]) if raw_slot.get("id") else None,
                 )
             )

@@ -1,4 +1,4 @@
-const CARD_VERSION = "2.0.0";
+const CARD_VERSION = "2.1.0";
 
 console.info(
   "%c HA-TENUP-CARD %c v" + CARD_VERSION + " ",
@@ -16,6 +16,7 @@ console.info(
 const T = {
   en: {
     book: "Book", cancel: "Cancel", you: "You", free: "Free", busy: "Booked", past: "Past",
+    unavailable: "Not bookable",
     confirm_book: "Book {court} on {date}, {start} to {end}?",
     confirm_cancel: "Cancel your reservation on {court}, {date} at {start}?",
     yes_book: "Book", yes_cancel: "Cancel the reservation", back: "Back",
@@ -52,6 +53,7 @@ const T = {
   },
   fr: {
     book: "R\u00e9server", cancel: "Annuler", you: "Vous", free: "Libre", busy: "Occup\u00e9", past: "Pass\u00e9",
+    unavailable: "Non r\u00e9servable",
     confirm_book: "R\u00e9server {court} le {date} de {start} \u00e0 {end} ?",
     confirm_cancel: "Annuler votre r\u00e9servation sur {court}, {date} \u00e0 {start} ?",
     yes_book: "R\u00e9server", yes_cancel: "Annuler la r\u00e9servation", back: "Retour",
@@ -122,6 +124,9 @@ function hhmm(iso) {
 
 /** "past" when the slot is over, otherwise the state Ten'Up gave. */
 function slotState(slot, now) {
+  // The half hour a 90-minute lesson leaves behind: nobody can take it, now or
+  // later, so it never becomes "past" either. Ten'Up hatches it; so do we.
+  if (slot.state === "closed") return "closed";
   const end = new Date(slot.end).getTime();
   // A booking of ours that is over stays ours on the grid, but there is nothing left
   // to cancel: Ten'Up can still print the link, the card must not offer it.
@@ -312,6 +317,9 @@ const STYLE = `
   .dialog .fname { width: 100%; box-sizing: border-box; margin-top: 10px; padding: 7px 9px;
                    border-radius: 6px; border: 1px solid var(--divider-color);
                    background: var(--card-background-color); color: var(--primary-text-color); font-size: 1em; }
+  .cell.closed { cursor: default; border: 1px solid var(--divider-color);
+    background: repeating-linear-gradient(45deg, transparent, transparent 4px,
+      rgba(127, 127, 127, 0.30) 4px, rgba(127, 127, 127, 0.30) 8px); }
   .cell.past { background: rgba(127, 127, 127, 0.14); color: var(--disabled-text-color); border: 1px solid var(--divider-color); }
   .cell.mine { background: #1565c0; color: #fff; cursor: pointer; border: 1px solid #64b5f6; }
   .cell.pending { background: #4a4a57; color: #f1f1f5; border: 1px solid #7b7b8b; cursor: progress;
@@ -810,6 +818,9 @@ class TenupCard extends HTMLElement {
       } else if (state === "mine_past") {
         cls = "mine-past";
         inner = `<span>${esc(t(hass, cfg, "you"))}</span><span class="x">${esc(hhmm(s.start))}</span>`;
+      } else if (state === "closed") {
+        // No label, no time: an empty hatched band, as the site draws it.
+        action = ` title="${esc(t(hass, cfg, "unavailable"))}"`;
       } else if (state === "past") {
         inner = `<span>${esc(hhmm(s.start))}</span>`;
       } else {

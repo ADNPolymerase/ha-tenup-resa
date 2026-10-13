@@ -49,6 +49,8 @@ const DAY2 = {
     slot('21100', '2026-09-12T11:00:00+02:00', '2026-09-12T11:30:00+02:00', 'free'),
     slot('21100', '2026-09-12T11:30:00+02:00', '2026-09-12T13:00:00+02:00', 'busy', { label: 'CJ sam 11h30 Alex Robin' }),
     slot('21101', '2026-09-12T10:00:00+02:00', '2026-09-12T11:00:00+02:00', 'free'),
+    // the half hour a 90-minute lesson leaves behind: hatched, not a hole
+    slot('21100', '2026-09-12T13:00:00+02:00', '2026-09-12T13:30:00+02:00', 'closed'),
   ],
 };
 const DATA = { entry_id: 'entry-1', club_code: '87654321', club_name: 'DEMO (TENNIS CLUB)', fetched_at: '2026-09-10T20:25:00+02:00', courts: COURTS, days: [DAY1, DAY2] };
@@ -82,7 +84,7 @@ ok('my reservation still to come stays cancellable', H.slotState(DAY1.slots[3], 
 let axis = H.buildAxis(DAY1.slots);
 ok('hourly axis when every slot is on the hour', axis.step === 60 && axis.start === 19 * 60 && axis.end === 22 * 60 && axis.rows === 3);
 axis = H.buildAxis(DAY2.slots);
-ok('30-minute axis as soon as a slot is not on the hour', axis.step === 30 && axis.start === 10 * 60 && axis.end === 13 * 60 && axis.rows === 6);
+ok('30-minute axis as soon as a slot is not on the hour', axis.step === 30 && axis.start === 10 * 60 && axis.end === 13 * 60 + 30 && axis.rows === 7);
 axis = H.buildAxis(DAY1.slots, 20, 21);
 ok('start_hour / end_hour clamp the axis', axis.start === 20 * 60 && axis.end === 21 * 60 && axis.rows === 1);
 ok('sortedJson is key-order independent', H.sortedJson({ b: 1, a: [{ d: 2, c: 3 }] }) === H.sortedJson({ a: [{ c: 3, d: 2 }], b: 1 }));
@@ -134,6 +136,19 @@ ok('french strings', H.t({ language: 'fr' }, {}, 'book') === 'Réserver' && H.t(
 {
   const card = await makeCard({ next_booking: false });
   ok('the option turns the banner off', !card._markup(NOW).includes('class="next"'));
+}
+{
+  // A 90-minute lesson leaves half an hour nobody can book. The site hatches
+  // that band; leaving a hole instead reads as a bug in the card.
+  const card = await makeCard({ days: 2 });
+  card._day = 1;
+  const html = card._markup(NOW);
+  contains('a band nobody can book is drawn, not left blank', html, 'class="cell closed"');
+  ok('it carries no time and no label',
+     !/class="cell closed"[^>]*>\s*<span/.test(html));
+  ok('it offers nothing to click', !/class="cell closed"[^>]*data-action/.test(html));
+  ok('and it stays hatched once the day is over',
+     card._markup(new Date('2026-09-13T12:00:00+02:00').getTime()).includes('class="cell closed"'));
 }
 {
   const card = await makeCard({ days: 2, language: 'fr' });

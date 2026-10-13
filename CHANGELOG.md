@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.0
+
+### The gaps left by 90-minute lessons are drawn, not left blank
+
+A lesson that runs an hour and a half leaves half an hour behind it, and that
+half hour is too short for the club to let anyone book. Ten'Up sends the cell
+and hatches it; the card dropped it, which left a black hole in the middle of
+the grid and read as a bug rather than as "nothing to take here".
+
+Those bands are now kept and hatched, the way the site draws them: no time, no
+label, nothing to click. They stay hatched once the day is over, since they
+never were bookable.
+
 ## 2.0.0
 
 ### Ten'Up rebuilt its member area, and this follows it
