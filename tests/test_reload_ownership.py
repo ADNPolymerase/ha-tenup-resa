@@ -92,3 +92,53 @@ def test_the_listener_reloads_what_it_cannot_absorb():
 
 def test_the_listener_stays_quiet_on_an_absorbed_change():
     assert run_listener(True) == []
+
+
+# --------------------------------------------------------- the dormant entry
+def _flow_with(state):
+    """A config flow with just enough around it to call the reload guard."""
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.tenup.config_flow import TenupConfigFlow
+
+    reloaded: list[str] = []
+    flow = TenupConfigFlow.__new__(TenupConfigFlow)
+    flow.hass = SimpleNamespace(
+        config_entries=SimpleNamespace(async_schedule_reload=reloaded.append)
+    )
+    entry = SimpleNamespace(entry_id="abcd", state=state)
+    return flow, entry, reloaded
+
+
+def test_a_dormant_entry_is_woken_by_the_flow():
+    """Its listener was never registered, so nobody else would ever reload it.
+
+    This is the entry a user is most likely to be reauthenticating: setup failed
+    on an expired session, and without this the freshly pasted one sits unused
+    until Home Assistant is restarted.
+    """
+    from homeassistant.config_entries import ConfigEntryState
+
+    for state in (
+        ConfigEntryState.SETUP_ERROR,
+        ConfigEntryState.SETUP_RETRY,
+        ConfigEntryState.NOT_LOADED,
+    ):
+        flow, entry, reloaded = _flow_with(state)
+        flow._schedule_reload_if_dormant(entry)
+        assert reloaded == ["abcd"], state
+
+
+def test_a_loaded_entry_is_left_to_its_listener():
+    """Reloading it here too is the race Home Assistant raises on from 2026.12."""
+    from homeassistant.config_entries import ConfigEntryState
+
+    flow, entry, reloaded = _flow_with(ConfigEntryState.LOADED)
+    flow._schedule_reload_if_dormant(entry)
+    assert reloaded == []
+
+
+def test_both_ways_out_of_the_flow_go_through_the_guard():
+    """A reauth and a reconfigure both land on an entry that may be dormant."""
+    assert FLOW.count("_schedule_reload_if_dormant(entry)") == 2
+    assert "async_update_reload_and_abort" not in FLOW

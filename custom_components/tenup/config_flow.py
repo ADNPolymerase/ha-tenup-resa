@@ -9,6 +9,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
@@ -157,6 +158,18 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         }
 
+    def _schedule_reload_if_dormant(self, entry: ConfigEntry) -> None:
+        """Wake an entry that failed to set up, once it has a working session.
+
+        The update listener owns every reload, but it is registered at the end
+        of a successful setup: an entry that never got that far has none, and a
+        freshly pasted session would sit there doing nothing until the next
+        restart of Home Assistant. That is exactly the entry a user is most
+        likely to be reauthenticating.
+        """
+        if entry.state is not ConfigEntryState.LOADED:
+            self.hass.config_entries.async_schedule_reload(entry.entry_id)
+
     async def _async_validate_cookie(self, cookie: str, club_code: str) -> tuple[str | None, str]:
         """Try what the user pasted; returns (error, cookie to store)."""
         try:
@@ -205,9 +218,10 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             if error:
                 errors["base"] = error
             else:
-                # Not the reloading variant: the entry has an update listener,
-                # and letting Home Assistant reload too would race with it.
-                # Combining both raises an error from Home Assistant 2026.12.
+                # Not the reloading variant: a loaded entry has an update
+                # listener, and letting Home Assistant reload too would race
+                # with it. Combining both raises an error from HA 2026.12.
+                self._schedule_reload_if_dormant(entry)
                 return self.async_update_and_abort(
                     entry, data_updates={CONF_COOKIE: cookie}
                 )
@@ -234,6 +248,7 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 entry = self._get_reauth_entry()
                 # See the reconfigure step: the update listener owns the reload.
+                self._schedule_reload_if_dormant(entry)
                 return self.async_update_and_abort(entry, data_updates={CONF_COOKIE: cookie})
         return self.async_show_form(
             step_id="reauth_confirm",

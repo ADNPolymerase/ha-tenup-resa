@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.3
+
+### A pasted session now takes effect without reloading by hand
+
+Since 1.2.0 the update listener owns every reload of the entry, which keeps a
+reauth from being reloaded twice. But that listener is registered at the end of
+a successful setup: an entry that never got that far has none, so a freshly
+pasted session was written and then sat there doing nothing. That is exactly the
+entry a user is most likely to be reauthenticating, and the only way out was a
+restart of Home Assistant.
+
+The flow now wakes an entry that is not loaded, and still leaves a loaded one to
+its listener, which is the race Home Assistant raises on from 2026.12.
+
 ## 2.0.2
 
 ### Pasting a whole "Copy as cURL" now sends every cookie
