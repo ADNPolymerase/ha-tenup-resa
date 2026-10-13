@@ -96,34 +96,52 @@ def test_friend_list_is_cleaned_before_being_stored():
     assert len(clean_friends([f"ami{n}" for n in range(MAX_FRIENDS + 20)])) == MAX_FRIENDS
 
 
+SESSION = "SHARED_SESSION_JAVA=f1e2d3c4-0000-4a5b-8c9d-0e1f2a3b4c5d"
 SHARED = "SHARED_SESSION_DRUPAL=aae6fe4e-0700-49d0-84ea-7b283f14affa"
 SSESS = "SSESS7ba44afc36c80c3faa2b8fa87e7742c5=Kj3-nV_9xQp2"
 
 
-def test_cookie_candidates_extracts_the_shared_cookie():
-    """It is not HttpOnly, so it is the one a bookmarklet can hand over."""
+def test_the_session_cookie_is_pulled_out_of_a_copy_as_curl():
+    """The one the site authenticates with, among everything a browser carries."""
+    from custom_components.tenup.api import cookie_candidates
+
+    assert cookie_candidates(f"-b 'datadome=x; {SESSION}; userStore=%7B%7D'") == [SESSION]
+
+
+def test_the_session_cookie_comes_before_the_one_it_replaced():
+    """A browser that lived through the 2026 rebuild still carries the old one.
+
+    It is accepted so an entry made before the rebuild still loads, but it is no
+    longer what Ten'Up authenticates with, so it must never be tried first.
+    """
+    from custom_components.tenup.api import cookie_candidates
+
+    assert cookie_candidates(f"-b '{SSESS}; {SHARED}; {SESSION}'")[0] == SESSION
+
+
+def test_the_old_cookies_are_still_read_on_their_own():
     from custom_components.tenup.api import cookie_candidates
 
     assert cookie_candidates(f"-b 'datadome=x; {SHARED}; _ga=1'") == [SHARED]
-
-
-def test_cookie_candidates_prefers_the_shared_cookie_over_the_session_one():
-    """Both are valid, but only the shared one survives the Drupal session."""
-    from custom_components.tenup.api import cookie_candidates
-
     assert cookie_candidates(f"-b '{SSESS}; {SHARED}'") == [SHARED, SSESS]
 
 
-def test_cookie_candidates_reads_a_bare_uuid_as_the_shared_cookie():
+def test_a_bare_uuid_is_tried_as_the_session_cookie_first():
     """Pasting just the value must not send a UUID as a Drupal session id."""
     from custom_components.tenup.api import cookie_candidates
 
-    got = cookie_candidates("  aae6fe4e-0700-49d0-84ea-7b283f14affa \n")
-    assert got[0] == SHARED
+    got = cookie_candidates("  f1e2d3c4-0000-4a5b-8c9d-0e1f2a3b4c5d \n")
+    assert got[0] == SESSION
+    assert got[1].startswith("SHARED_SESSION_DRUPAL="), "the old one stays a fallback"
 
 
-def test_cookie_candidates_still_maps_a_bare_non_uuid_to_the_session_names():
-    from custom_components.tenup.api import SHARED_COOKIE_NAME, cookie_candidates
+def test_a_bare_non_uuid_is_never_read_as_one_of_the_shared_cookies():
+    from custom_components.tenup.api import (
+        SESSION_COOKIE_NAME,
+        SHARED_COOKIE_NAME,
+        cookie_candidates,
+    )
 
     got = cookie_candidates("abc-DEF_123")
     assert not any(c.startswith(SHARED_COOKIE_NAME) for c in got)
+    assert not any(c.startswith(SESSION_COOKIE_NAME) for c in got)

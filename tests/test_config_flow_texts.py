@@ -56,17 +56,23 @@ def test_no_link_points_back_at_home_assistant(monkeypatch):
         assert "install_page" not in text, (name, step)
 
 
-def test_the_bookmarklet_is_shown_in_the_dialog(monkeypatch):
-    values = make_flow(monkeypatch=monkeypatch)._placeholders()
-    assert values["bookmarklet"].startswith("javascript:(function()")
-    assert "SHARED_SESSION_DRUPAL" in values["bookmarklet"]
+def test_the_dialog_names_the_cookie_to_copy(monkeypatch):
+    """The session cookie is HttpOnly since the 2026 rebuild, so no script can
 
+    hand it over: the dialog has to say which row to copy, and where.
+    """
+    import json
+    from pathlib import Path
 
-def test_the_bookmarklet_follows_the_home_assistant_language(monkeypatch):
-    fr = make_flow(language="fr", monkeypatch=monkeypatch)._placeholders()["bookmarklet"]
-    en = make_flow(language="en", monkeypatch=monkeypatch)._placeholders()["bookmarklet"]
-    assert "Reserver dans mon club" in fr and "Reserver dans mon club" not in en
-    assert "Book at my club" in en and "Book at my club" not in fr
+    texts = json.loads(
+        (Path(__file__).parent.parent / "custom_components/tenup/translations/fr.json")
+        .read_text(encoding="utf-8")
+    )
+    for name in ("cookie", "reauth_confirm", "reconfigure"):
+        description = texts["config"]["step"][name]["description"]
+        assert "SHARED_SESSION_JAVA" in description, name
+        assert "Cookies" in description, name
+        assert "{bookmarklet}" not in description, name
 
 
 def test_the_first_step_points_at_the_club_grid(monkeypatch):
@@ -93,11 +99,5 @@ def test_no_club_code_stays_on_the_site(monkeypatch):
     flow = make_flow(monkeypatch=monkeypatch)
     flow._club_code = None
     assert flow._placeholders()["club_url"] == "https://tenup.fft.fr"
-
-
-def test_the_bookmarklet_says_where_to_be(monkeypatch):
-    """Its failure message is the only guidance a user gets on the wrong page."""
-    fr = make_flow(monkeypatch=monkeypatch)._placeholders()["bookmarklet"]
-    assert "Reserver dans mon club" in fr
 
 

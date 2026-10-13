@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.0.1
+
+### The session cookie changed name, and became HttpOnly
+
+2.0.0 could reach the new API but never authenticate: the rebuild moved the back
+end from Drupal to Java and renamed its session cookie with it. The site's own
+code names `SHARED_SESSION_JAVA`, and no longer mentions the Drupal one at all.
+A browser that lived through the migration still carries the old cookie, which
+is exactly what made the failure confusing: the bookmarklet kept handing over a
+perfectly fresh value that Ten'Up no longer accepts.
+
+The integration now reads and sends the new cookie, and still accepts the old
+ones so an installation made before the rebuild loads and says the session is
+dead rather than that the cookie is malformed.
+
+### The bookmarklet is gone
+
+The new cookie is `HttpOnly`: no page script can read it, so no bookmarklet can
+hand it over. The install page it was served from is removed rather than left
+teaching a method that cannot work.
+
+The session is now copied from the browser's developer tools, Cookies view, or
+by pasting a whole "Copy as cURL" from the Network tab, which the integration
+has always known how to read.
+
 ## 2.0.0
 
 ### Ten'Up rebuilt its member area, and this follows it

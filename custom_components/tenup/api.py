@@ -65,10 +65,21 @@ class TenupBookingError(TenupError):
     """Ten'Up refused a booking or a cancellation, with its own message."""
 
 
-# Drupal 7 names its session cookie SESS + sha256(cookie domain)[:32], with an
-# SSESS prefix when the site is served over HTTPS. Ten'Up sets it on ".fft.fr"
-# (observed: SSESS7ba44afc36c80c3faa2b8fa87e7742c5); the other domains are kept
-# in case the FFT changes its setup. Tried in order when the user pastes only the value.
+# The session cookie of the member area, named by the site's own code. The 2026
+# rebuild moved the back end from Drupal to Java and renamed the cookie with it;
+# unlike the Drupal one it is HttpOnly, so no bookmarklet can read it and the
+# user copies it from the browser's developer tools.
+SESSION_COOKIE_NAME = "SHARED_SESSION_JAVA"
+
+# What the previous site used. A browser that has been through the migration
+# still carries it, and it is now refused by the API, so it is accepted only as
+# a last resort: an installation that predates the rebuild keeps loading, and
+# says the session is dead rather than that the cookie is malformed.
+SHARED_COOKIE_NAME = "SHARED_SESSION_DRUPAL"
+
+# Drupal 7 named its own session cookie SESS + sha256(cookie domain)[:32], with
+# an SSESS prefix over HTTPS. Kept for the same reason, and because an old entry
+# may still hold one.
 _DOMAIN_HASHES = (
     "7ba44afc36c80c3faa2b8fa87e7742c5",  # .fft.fr
     "cb2134c30942b300c65ef3e7a0cb8122",  # tenup.fft.fr
@@ -76,20 +87,17 @@ _DOMAIN_HASHES = (
     "92f2eb7df5a16f11bfa33ba3b3d183bd",  # fft.fr
     "a3f3c315059fce3e5cba5addd6cfa12b",  # www.tenup.fft.fr
 )
-SESSION_COOKIE_NAMES = tuple(f"{prefix}{h}" for h in _DOMAIN_HASHES for prefix in ("SSESS", "SESS"))
+# Only these can carry a value that is not a UUID, so a bare paste that is not
+# one is tried against them alone.
+SESSION_COOKIE_NAMES = tuple(
+    f"{prefix}{h}" for h in _DOMAIN_HASHES for prefix in ("SSESS", "SESS")
+)
 
-# Any Drupal 7 session cookie, whatever the domain hash, wherever it sits: the
-# user can paste a whole "Copy as cURL" command instead of hunting for the
-# value in the cookie storage view. The value stops at the first separator a
-# shell or a header would use.
-# Ten'Up bridges its Nuxt front and its Drupal back with a second cookie, which
-# is NOT HttpOnly and outlives the Drupal session by about a month. On its own it
-# is enough for Drupal to open a session, so it is the credential worth keeping:
-# the user can copy it without the developer tools, and Home Assistant mints a
-# fresh SSESS from it whenever it needs one.
-SHARED_COOKIE_NAME = "SHARED_SESSION_DRUPAL"
+# Any of them, wherever it sits: the user can paste a whole "Copy as cURL"
+# command, or the single line the developer tools show, rather than hunt for the
+# value. A value stops at the first separator a shell or a header would use.
 _COOKIE_RE = re.compile(
-    r"\b(SHARED_SESSION_DRUPAL|S?SESS[0-9a-f]{32})=([^;,'\"\s]+)"
+    r"\b(SHARED_SESSION_JAVA|SHARED_SESSION_DRUPAL|S?SESS[0-9a-f]{32})=([^;,'\"\s]+)"
 )
 _SESSION_NAME_RE = re.compile(r"S?SESS[0-9a-f]{32}\Z")
 _UUID_RE = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\Z")
@@ -119,8 +127,16 @@ def cookie_candidates(raw: str) -> list[str]:
         if pair not in found:
             found.append(pair)
     if found:
-        # The shared cookie lives longer, so try it first: it is the one we keep.
-        found.sort(key=lambda pair: not pair.startswith(f"{SHARED_COOKIE_NAME}="))
+        # The one the site actually authenticates with comes first, then the one
+        # it replaced: the others are only there so an entry made before the 2026
+        # rebuild still loads and reports a dead session rather than a bad cookie.
+        order = (SESSION_COOKIE_NAME, SHARED_COOKIE_NAME)
+        found.sort(
+            key=lambda pair: next(
+                (i for i, name in enumerate(order) if pair.startswith(f"{name}=")),
+                len(order),
+            )
+        )
         return found
     if "=" in text:
         return [text]
@@ -128,8 +144,10 @@ def cookie_candidates(raw: str) -> list[str]:
         raise ValueError("not a cookie value")
     names = list(SESSION_COOKIE_NAMES)
     if _UUID_RE.match(text):
-        # A bare UUID can only be the shared cookie.
-        names.insert(0, SHARED_COOKIE_NAME)
+        # Both the session cookie and the one it replaced are plain UUIDs.
+        names = [SESSION_COOKIE_NAME, SHARED_COOKIE_NAME] + [
+            name for name in names if name not in (SESSION_COOKIE_NAME, SHARED_COOKIE_NAME)
+        ]
     return [f"{name}={text}" for name in names]
 
 
@@ -200,9 +218,11 @@ class TenupClient:
         for morsel in self._jar:
             if not morsel.value:
                 continue
-            if morsel.key == SHARED_COOKIE_NAME:
+            if morsel.key == SESSION_COOKIE_NAME:
                 return f"{morsel.key}={morsel.value}"
-            if _SESSION_NAME_RE.match(morsel.key) and fallback is None:
+            if fallback is None and (
+                morsel.key == SHARED_COOKIE_NAME or _SESSION_NAME_RE.match(morsel.key)
+            ):
                 fallback = f"{morsel.key}={morsel.value}"
         return fallback
 

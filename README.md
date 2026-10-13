@@ -48,17 +48,13 @@ The card comes with it: there is nothing else to download and no Lovelace resour
 
 1. **Your club**: type its name, pick it in the list (or paste its 8-digit Ten'Up code, visible in the URL of the reservation grid).
 2. **Your session**: Ten'Up does not allow logging in with a password from a third-party tool (the login page is protected against automated logins), so the integration works with the session of your browser:
-   **The easy way, no developer tools.** The Home Assistant form shows the line below directly: create a bookmark whose address is that line. Home Assistant also serves an install page where the bookmarklet can be **dragged** to the bookmarks bar, at `/api/tenup/bookmarklet` on your instance (for example `http://homeassistant.local:8123/api/tenup/bookmarklet`), to open in a tab. Then log in on tenup.fft.fr, **open "Book at my club"** (the bookmarklet only works from inside the reservation area, not from the home page), and click it: it puts the session in your clipboard, you only have to paste it into Home Assistant. If the browser refuses clipboard access, it shows the value to copy.
+   **In the developer tools.** Sign in on tenup.fft.fr and open **"Book at my club"**. Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** > `https://tenup.fft.fr`, and copy the value of the **`SHARED_SESSION_JAVA`** row:
 
-   ```javascript
-   javascript:(function(){var m=document.cookie.match(/(?:^|;\s*)SHARED_SESSION_DRUPAL=([^;]+)/);if(!m){alert("Log in on tenup.fft.fr first, then click again.");return}var v="SHARED_SESSION_DRUPAL="+m[1];function f(){prompt("Paste this into Home Assistant:",v)}try{navigator.clipboard.writeText(v).then(function(){alert("Session copied. Paste it into Home Assistant (Ctrl+V or Cmd+V).")},f)}catch(e){f()}})()
-   ```
+   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png" alt="The session cookie row in the cookies" width="760">
 
-   The bookmarklet reads `SHARED_SESSION_DRUPAL`, the cookie that bridges the site and its reservation area. It is not `HttpOnly`, so a page script can read it, and it lives for about **two months**. Home Assistant uses it to open a session whenever it needs one, so you re-paste far less often.
+   **Easier, if you prefer:** **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing into the field: the session is picked out of it on its own.
 
-   **Without the bookmarklet**, the value is in the developer tools (F12) > Application tab > Cookies > `https://tenup.fft.fr`:
-
-   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png" alt="The SHARED_SESSION_DRUPAL row in the cookies" width="760">
+   This cookie is `HttpOnly` since the October 2026 rebuild: no page script can read it, and the bookmarklet of earlier versions no longer works.
 
    Or: Network tab > right-click a row > Copy > **Copy as cURL**, and paste the whole thing. The integration keeps only the useful cookie: URLs, headers and other cookies are ignored and never stored.
 

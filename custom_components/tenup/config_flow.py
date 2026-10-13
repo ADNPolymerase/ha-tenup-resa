@@ -37,7 +37,6 @@ from .api import (
     new_session,
     parse_cookie_header,
 )
-from .http import BOOKMARKLET, EN, FR
 from .const import (
     CONF_CLUB_CODE,
     CONF_CLUB_NAME,
@@ -141,12 +140,6 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     def _placeholders(self) -> dict[str, str]:
-        language = (self.hass.config.language or "en").lower()
-        texts = FR if language.startswith("fr") else EN
-        # No link to the install page here on purpose. It sits on the Home
-        # Assistant origin, so the frontend router catches the click, does not
-        # know the path, and lands the user on their default dashboard. The line
-        # to copy is in the dialog itself, which is what the page was for.
         return {
             "club": self._club_name or "",
             "club_code": self._club_code or "",
@@ -162,9 +155,6 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
                 if self._club_code
                 else "https://tenup.fft.fr"
             ),
-            # Shown in the dialog itself: the user has the line under their eyes,
-            # with no page to open and nothing to go and look for.
-            "bookmarklet": BOOKMARKLET % texts,
         }
 
     async def _async_validate_cookie(self, cookie: str, club_code: str) -> tuple[str | None, str]:

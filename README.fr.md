@@ -48,17 +48,13 @@ La carte vient avec : rien d'autre à télécharger, aucune ressource Lovelace �
 
 1. **Votre club** : tapez son nom et choisissez-le dans la liste (ou collez son code Ten'Up à 8 chiffres, visible dans l'URL du tableau de réservation).
 2. **Votre session** : Ten'Up n'autorise pas la connexion par mot de passe depuis un outil tiers (la page de connexion est protégée contre les connexions automatisées). L'intégration utilise donc la session de votre navigateur :
-   **Le plus simple, sans outils de développement.** Le formulaire de Home Assistant affiche directement la ligne ci-dessous : créez un favori dont l'adresse est cette ligne. Home Assistant sert aussi une page d'installation où le marque-page se **glisse** dans la barre de favoris, à l'adresse `/api/tenup/bookmarklet` de votre instance (par exemple `http://homeassistant.local:8123/api/tenup/bookmarklet`), à ouvrir dans un onglet. Connectez-vous ensuite sur tenup.fft.fr, **ouvrez « Réserver dans mon club »** (le marque-page ne fonctionne que depuis l'espace de réservation, pas depuis l'accueil), puis cliquez dessus : il met la session dans votre presse-papier, vous n'avez plus qu'à la coller dans Home Assistant. Si le navigateur refuse le presse-papier, il affiche la valeur à copier.
+   **Dans les outils de développement.** Connectez-vous sur tenup.fft.fr et ouvrez **« Réserver dans mon club »**. Appuyez sur **F12** (⌥⌘I sur Mac), onglet **Application** (**Stockage** sous Firefox), rubrique **Cookies** > `https://tenup.fft.fr`, et copiez la valeur de la ligne **`SHARED_SESSION_JAVA`** :
 
-   ```javascript
-   javascript:(function(){var m=document.cookie.match(/(?:^|;\s*)SHARED_SESSION_DRUPAL=([^;]+)/);if(!m){alert("Connectez-vous d'abord sur tenup.fft.fr, puis recliquez.");return}var v="SHARED_SESSION_DRUPAL="+m[1];function f(){prompt("Collez ceci dans Home Assistant:",v)}try{navigator.clipboard.writeText(v).then(function(){alert("Session copiee. Collez-la dans Home Assistant (Ctrl+V ou Cmd+V).")},f)}catch(e){f()}})()
-   ```
+   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.fr.png" alt="La ligne du cookie de session dans les cookies" width="760">
 
-   Ce marque-page lit `SHARED_SESSION_DRUPAL`, le cookie qui relie le site à son espace de réservation. Il n'est pas `HttpOnly`, donc un script de page peut le lire, et il vit environ **deux mois**. Home Assistant s'en sert pour ouvrir une session quand il en a besoin, ce qui espace d'autant les recollages.
+   **Encore plus simple si vous préférez :** onglet **Réseau**, clic droit sur n'importe quelle requête, **Copier > Copier comme cURL**, et collez le tout dans le champ : la session y est retrouvée toute seule.
 
-   **Sans marque-page**, la valeur se lit dans les outils de développement (F12) > onglet Appli > Cookies > `https://tenup.fft.fr` :
-
-   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.fr.png" alt="La ligne SHARED_SESSION_DRUPAL dans les cookies" width="760">
+   Ce cookie est `HttpOnly` depuis la refonte d'octobre 2026 : aucun script de page ne peut le lire, et le marque-page des versions précédentes ne fonctionne plus.
 
    Au choix aussi : onglet Réseau > clic droit sur une ligne > Copier > **Copier en tant que cURL**, et collez le tout. L'intégration ne retient que le cookie utile : adresses, en-têtes et autres cookies sont ignorés et ne sont jamais enregistrés.
 
