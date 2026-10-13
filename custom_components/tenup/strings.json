@@ -16,21 +16,21 @@
       },
       "cookie": {
         "title": "Ten'Up session",
-        "description": "Ten'Up does not allow logging in with a password from an integration, so it needs your session.\n\nClub: {club} ({club_code}).\n\n**1. [Open your club's planning]({club_url})** in a new tab and sign in with your FFT credentials. That is the **Book at my club** page. Leave it open.\n\n**2.** Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** → `https://tenup.fft.fr`. Copy the value of the **SHARED_SESSION_JAVA** row.\n\nEasier, if you prefer: **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing below: the session is picked out of it on its own.\n\n**3.** Come back here and paste the session in the field below.",
+        "description": "Ten'Up does not allow logging in with a password from an integration, so it needs your session.\n\nClub: {club} ({club_code}).\n\n**1. [Open your club's planning]({club_url})** in a new tab and sign in with your FFT credentials. That is the **Book at my club** page. Leave it open.\n\n**2.** Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** → `https://tenup.fft.fr`. Copy the value of the **SHARED_SESSION_JAVA** row.\n\n![The SHARED_SESSION_JAVA row in the cookies](https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png)\n\nEasier, if you prefer: **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing below: the session is picked out of it on its own.\n\n**3.** Come back here and paste the session in the field below.",
         "data": {
           "cookie": "Session cookie"
         }
       },
       "reauth_confirm": {
         "title": "Ten'Up session expired",
-        "description": "The Ten'Up session for {club} ({club_code}) is no longer accepted.\n\n**1. [Open your club's planning]({club_url})** in a new tab and sign in with your FFT credentials. That is the **Book at my club** page. Leave it open.\n\n**2.** Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** → `https://tenup.fft.fr`. Copy the value of the **SHARED_SESSION_JAVA** row.\n\nEasier, if you prefer: **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing below: the session is picked out of it on its own.\n\n**3.** Come back here and paste the session in the field below.",
+        "description": "The Ten'Up session for {club} ({club_code}) is no longer accepted.\n\n**1. [Open your club's planning]({club_url})** in a new tab and sign in with your FFT credentials. That is the **Book at my club** page. Leave it open.\n\n**2.** Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** → `https://tenup.fft.fr`. Copy the value of the **SHARED_SESSION_JAVA** row.\n\n![The SHARED_SESSION_JAVA row in the cookies](https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png)\n\nEasier, if you prefer: **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing below: the session is picked out of it on its own.\n\n**3.** Come back here and paste the session in the field below.",
         "data": {
           "cookie": "Session cookie"
         }
       },
       "reconfigure": {
         "title": "Ten'Up session",
-        "description": "Hand over a new session for {club} ({club_code}).\n\n**1. [Open your club's planning]({club_url})** in a new tab and sign in with your FFT credentials. That is the **Book at my club** page. Leave it open.\n\n**2.** Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** → `https://tenup.fft.fr`. Copy the value of the **SHARED_SESSION_JAVA** row.\n\nEasier, if you prefer: **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing below: the session is picked out of it on its own.\n\n**3.** Come back here and paste the session in the field below.",
+        "description": "Hand over a new session for {club} ({club_code}).\n\n**1. [Open your club's planning]({club_url})** in a new tab and sign in with your FFT credentials. That is the **Book at my club** page. Leave it open.\n\n**2.** Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** → `https://tenup.fft.fr`. Copy the value of the **SHARED_SESSION_JAVA** row.\n\n![The SHARED_SESSION_JAVA row in the cookies](https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png)\n\nEasier, if you prefer: **Network** tab, right-click any request, **Copy > Copy as cURL**, and paste the whole thing below: the session is picked out of it on its own.\n\n**3.** Come back here and paste the session in the field below.",
         "data": {
           "cookie": "Session cookie"
         }

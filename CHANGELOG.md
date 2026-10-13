@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.4
+
+### The dialog now shows which row to copy
+
+Both session cookies are plain UUIDs sitting next to each other, and a browser
+that lived through the rebuild still carries the old one. Nothing in the values
+tells them apart, so the dialog now carries the picture: the row to take in
+green, the one to leave struck through in red.
+
+The screenshots are drawn, not captured: every value in them is a row of dots,
+so no session of anyone's is in this repository.
+
 ## 2.0.3
 
 ### A pasted session now takes effect without reloading by hand
