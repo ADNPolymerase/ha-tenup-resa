@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.3
+
+### The sign-in dialog serves its own picture
+
+Home Assistant refuses a URL inside a translated string and asks for a
+description placeholder instead, so the nightly validation failed on all three
+files at once: every step that asks for a session carried the address of the
+cookie store and the picture of the row to copy, written in the text.
+
+Both are placeholders now, and the picture moved into the integration, served
+next to the card. It therefore shows up on an install with no way out to the
+internet, which is exactly where it matters: the session is dead, and the
+picture is what tells you which of the two cookies to take. The one for the
+language of the install is picked.
+
+Nothing changes in what the dialog says or shows.
+
 ## 2.1.2
 
 ### The links to Ten'Up no longer point at a 404
