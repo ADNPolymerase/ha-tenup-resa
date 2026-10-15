@@ -50,7 +50,7 @@ La carte vient avec : rien d'autre à télécharger, aucune ressource Lovelace �
 2. **Votre session** : Ten'Up n'autorise pas la connexion par mot de passe depuis un outil tiers (la page de connexion est protégée contre les connexions automatisées). L'intégration utilise donc la session de votre navigateur :
    **Dans les outils de développement.** Connectez-vous sur tenup.fft.fr et ouvrez **« Réserver dans mon club »**. Appuyez sur **F12** (⌥⌘I sur Mac), onglet **Application** (**Stockage** sous Firefox), rubrique **Cookies** > `https://tenup.fft.fr`, et copiez la valeur de la ligne **`SHARED_SESSION_JAVA`** :
 
-   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.fr.png" alt="La ligne du cookie de session dans les cookies" width="760">
+   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/custom_components/tenup/assets/cookie-devtools.fr.png" alt="La ligne du cookie de session dans les cookies" width="760">
 
    Ce cookie est `HttpOnly` depuis la refonte d'octobre 2026 : aucun script de page ne peut le lire, et le marque-page des versions précédentes ne fonctionne plus.
 

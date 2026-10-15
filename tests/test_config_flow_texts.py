@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from custom_components.tenup import config_flow as cf
+from custom_components.tenup import frontend
 
 TRANSLATIONS = Path(cf.__file__).parent
 FILES = ["strings.json", "translations/fr.json", "translations/en.json"]
@@ -100,3 +101,39 @@ def test_no_club_code_stays_on_the_site(monkeypatch):
     assert flow._placeholders()["club_url"] == "https://tenup.fft.fr"
 
 
+
+
+def test_no_description_carries_a_url():
+    """Home Assistant refuses a URL in a translated string (hassfest), and says
+    to pass it as a description placeholder instead.
+
+    The figure of the cookie row and the address of the cookie store both used
+    to be written in the text, which failed validation on every file at once.
+    """
+    for name, step, text in descriptions():
+        assert "http://" not in text and "https://" not in text, (name, step)
+
+
+def test_the_figure_follows_the_language_of_the_install():
+    """Both pictures are drawn, one per language: show the right one."""
+    fr = make_flow(language="fr")._placeholders()["cookie_image"]
+    en = make_flow(language="en")._placeholders()["cookie_image"]
+    assert fr.endswith("cookie-devtools.fr.png")
+    assert en.endswith("cookie-devtools.png")
+    assert fr != en
+    # An unset language must still name a picture, never ".None.png".
+    assert make_flow(language=None)._placeholders()["cookie_image"] == en
+
+
+def test_the_figure_is_served_by_the_integration():
+    """A picture fetched from GitHub would be missing on an install with no way
+    out to the internet, and the dialog is exactly where that matters."""
+    url = make_flow()._placeholders()["cookie_image"]
+    assert url.startswith(frontend.ASSETS_URL_PATH + "/")
+    name = url.rsplit("/", 1)[-1]
+    assert (TRANSLATIONS / frontend.ASSETS_DIRNAME / name).is_file(), name
+
+
+def test_both_figures_ship_with_the_integration():
+    for name in ("cookie-devtools.png", "cookie-devtools.fr.png"):
+        assert (TRANSLATIONS / frontend.ASSETS_DIRNAME / name).is_file(), name

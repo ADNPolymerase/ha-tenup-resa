@@ -19,11 +19,25 @@ _LOGGER = logging.getLogger(__name__)
 CARD_FILENAME = "ha-tenup-card.js"
 CARD_URL_BASE = f"/{DOMAIN}_frontend"
 CARD_URL_PATH = f"{CARD_URL_BASE}/{CARD_FILENAME}"
+ASSETS_DIRNAME = "assets"
+ASSETS_URL_PATH = f"{CARD_URL_BASE}/{ASSETS_DIRNAME}"
 
 
 def card_url(version: str | None) -> str:
     """Return the resource URL, versioned so an update busts browser caches."""
     return f"{CARD_URL_PATH}?v={version or '0'}"
+
+
+def cookie_figure_url(language: str | None) -> str:
+    """Return the cookie-row figure the sign-in dialog shows.
+
+    The dialog cannot carry the address itself: a translation string may
+    not contain a URL, so it comes in as a description placeholder. And it
+    is served from the integration rather than from the repository, so the
+    picture shows up on an install with no way out to the internet.
+    """
+    fr = (language or "").lower().startswith("fr")
+    return f"{ASSETS_URL_PATH}/cookie-devtools{'.fr' if fr else ''}.png"
 
 
 def _filename(url: str) -> str:
@@ -93,7 +107,12 @@ async def async_register_card(hass: Any, version: str | None) -> None:
                 url_path=CARD_URL_PATH,
                 path=hass.config.path(f"custom_components/{DOMAIN}/{CARD_FILENAME}"),
                 cache_headers=True,
-            )
+            ),
+            StaticPathConfig(
+                url_path=ASSETS_URL_PATH,
+                path=hass.config.path(f"custom_components/{DOMAIN}/{ASSETS_DIRNAME}"),
+                cache_headers=True,
+            ),
         ]
     )
     new_url = card_url(version)

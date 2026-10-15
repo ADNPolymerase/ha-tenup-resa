@@ -50,7 +50,7 @@ The card comes with it: there is nothing else to download and no Lovelace resour
 2. **Your session**: Ten'Up does not allow logging in with a password from a third-party tool (the login page is protected against automated logins), so the integration works with the session of your browser:
    **In the developer tools.** Sign in on tenup.fft.fr and open **"Book at my club"**. Press **F12** (⌥⌘I on a Mac), **Application** tab (**Storage** in Firefox), **Cookies** > `https://tenup.fft.fr`, and copy the value of the **`SHARED_SESSION_JAVA`** row:
 
-   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/cookie-devtools.png" alt="The session cookie row in the cookies" width="760">
+   <img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/custom_components/tenup/assets/cookie-devtools.png" alt="The session cookie row in the cookies" width="760">
 
    This cookie is `HttpOnly` since the October 2026 rebuild: no page script can read it, and the bookmarklet of earlier versions no longer works.
 

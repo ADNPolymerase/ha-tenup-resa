@@ -53,6 +53,7 @@ from .const import (
     MIN_SCAN_INTERVAL_MINUTES,
 )
 from .coordinator import auth_state
+from .frontend import cookie_figure_url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -149,6 +150,11 @@ class TenupConfigFlow(ConfigFlow, domain=DOMAIN):
             "club_code": self._club_code or "",
             "site": "tenup.fft.fr",
             "site_url": "https://tenup.fft.fr",
+            # A translation string may not hold a URL, so the picture of the
+            # cookie row comes in from here, in the language of this install.
+            "cookie_image": cookie_figure_url(
+                getattr(getattr(getattr(self, "hass", None), "config", None), "language", None)
+            ),
             # Straight to this entry's own club grid: the session cookie is set
             # inside the reservation area, not on the Ten'Up home page. The date
             # used to be part of the address; the rebuilt site answers 404 to
