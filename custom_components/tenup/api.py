@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 import aiohttp
 from yarl import URL
 
-from .const import API, BASE_URL, QUEUE_ENQUEUE_URL, QUEUE_HOST, USER_AGENT
+from .const import API, BASE_URL, PUBLIC_API, QUEUE_ENQUEUE_URL, QUEUE_HOST, USER_AGENT
 from .models import (
     Eligibility,
     Partner,
@@ -194,6 +194,37 @@ class TenupClient:
     @property
     def club_code(self) -> str:
         return self._club_code
+
+    # -------------------------------------------------------------- club search
+    @staticmethod
+    async def async_search_clubs(
+        session: aiohttp.ClientSession, query: str, practice: str = "TENNIS"
+    ) -> list[dict[str, Any]]:
+        """Find clubs by name, with no session at all.
+
+        The rebuilt member area needs the cookie for everything, but the club
+        directory is public and still answers on the old address: it is what
+        lets someone set the integration up before they have handed over a
+        session, and the only way they can be asked for a club by name rather
+        than for an eight digit code they have no reason to know.
+
+        Returns the raw hits, each carrying at least ``code`` and ``nom``. The
+        shared Home Assistant session is enough here, no cookie jar of our own.
+        """
+        payload = {"query": query, "pratique": practice, "from": 0, "size": 10}
+        try:
+            async with session.post(
+                f"{PUBLIC_API}/clubs/recherche",
+                json=payload,
+                headers=_JSON_HEADERS,
+                timeout=_TIMEOUT,
+            ) as resp:
+                if resp.status != 200:
+                    raise TenupConnectionError(f"club search answered {resp.status}")
+                data = await resp.json(content_type=None)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise TenupConnectionError(f"club search: {err}") from err
+        return list(data.get("clubs") or [])
 
     async def _request(
         self,

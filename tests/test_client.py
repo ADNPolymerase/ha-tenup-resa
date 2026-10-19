@@ -623,3 +623,62 @@ def test_required_players_swallows_a_hiccup():
         assert await client.async_required_players(free_slot()) is None
 
     run(go)
+
+
+# ---------------------------------------------------------------- club search
+# The club directory is public: it is the one call made before the user has
+# handed over any session, and the reason the setup can ask for a club by name
+# instead of for an eight digit code. Club names here are invented.
+CLUB_HITS = {
+    "total": 2,
+    "clubs": [
+        {"code": "11111111", "nom": "TENNIS CLUB DU VILLAGE", "comite": "COMITE A"},
+        {"code": "22222222", "nom": "VILLAGE PADEL", "comite": "COMITE B"},
+    ],
+}
+
+
+def test_the_club_search_returns_the_hits_and_needs_no_session():
+    async def go():
+        session = FakeSession({("POST", "/clubs/recherche"): [FakeResponse(CLUB_HITS, "https://tenup.fft.fr/")]})
+        clubs = await TenupClient.async_search_clubs(session, "village")
+        assert [c["code"] for c in clubs] == ["11111111", "22222222"]
+        _, url, kwargs = session.calls[0]
+        assert url.endswith("/back/public/v1/clubs/recherche")
+        assert kwargs["json"] == {"query": "village", "pratique": "TENNIS", "from": 0, "size": 10}
+        assert "Cookie" not in kwargs["headers"]
+
+    run(go)
+
+
+def test_a_club_search_that_matches_nothing_is_not_an_error():
+    """The flow tells the user to try another name; it must not raise."""
+    async def go():
+        for body in ({"total": 0, "clubs": []}, {"total": 0, "clubs": None}, {}):
+            session = FakeSession({("POST", "/clubs/recherche"): [FakeResponse(body, "https://tenup.fft.fr/")]})
+            assert await TenupClient.async_search_clubs(session, "zzzz") == []
+
+    run(go)
+
+
+def test_a_refused_club_search_is_a_connection_error():
+    """403 is what the site's bot protection answers, and the flow shows
+    "cannot connect" for it rather than failing the step."""
+    async def go():
+        session = FakeSession({("POST", "/clubs/recherche"): [FakeResponse("<html/>", "https://tenup.fft.fr/", status=403)]})
+        with pytest.raises(TenupConnectionError):
+            await TenupClient.async_search_clubs(session, "village")
+
+    run(go)
+
+
+def test_a_club_search_that_cannot_reach_the_site_is_a_connection_error():
+    async def go():
+        class Dead(FakeSession):
+            def post(self, url, **kwargs):
+                raise aiohttp.ClientError("no route")
+
+        with pytest.raises(TenupConnectionError):
+            await TenupClient.async_search_clubs(Dead({}), "village")
+
+    run(go)
