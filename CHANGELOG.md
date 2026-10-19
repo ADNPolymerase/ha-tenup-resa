@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.1.4
+
+### The club search works again
+
+The 2.0.0 rewrite dropped `async_search_clubs` from the client and left the
+config flow calling it, so anything other than an eight digit club code raised
+an error on the first screen of the setup, which is exactly the step the README
+describes. The public club directory still answers on its old address and needs
+no session, which is what lets someone be asked for a club by name before they
+have handed over a cookie, so the call is restored rather than the question
+dropped.
+
+### Diagnostics keep the friends list
+
+They returned the options as they are, and those hold the names of other club
+members and, for a partner remembered from the card, their Ten'Up member id. A
+report gets pasted into public issues, so the list is redacted alongside the
+cookie.
+
+### Verification
+
+A hundred and thirty tests went green over that broken flow: they all built a
+client and called it directly, and not one walked the path a new user walks. A
+new test reads the integration's own source and fails on any client attribute
+the code uses but the class does not have, naming the file and the line.
+
+144 Python tests and 218 card assertions.
+
+Both findings come from the HACS review of this repository.
+
 ## 2.1.3
 
 ### The sign-in dialog serves its own picture

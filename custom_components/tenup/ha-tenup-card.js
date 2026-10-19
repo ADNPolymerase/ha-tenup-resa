@@ -1,4 +1,4 @@
-const CARD_VERSION = "2.1.3";
+const CARD_VERSION = "2.1.4";
 
 console.info(
   "%c HA-TENUP-CARD %c v" + CARD_VERSION + " ",
