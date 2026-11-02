@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.5
+
+### Documentation
+
+The link to the other language at the top of both READMEs is now a button with
+a flag on it, the same one the other cards use, so it is visible at a glance
+instead of being lost in a line of small print.
+
 ## 2.1.4
 
 ### The club search works again
