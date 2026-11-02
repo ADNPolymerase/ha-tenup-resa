@@ -2,6 +2,8 @@
 
 # Ten'Up pour Home Assistant
 
+<a href="https://github.com/ADNPolymerase/ha-tenup-resa/blob/main/README.md"><img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/lang-en.svg" alt="Read in English" height="60"></a>
+
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
 [![GitHub Release](https://badgen.net/github/release/ADNPolymerase/ha-tenup-resa)](https://github.com/ADNPolymerase/ha-tenup-resa/releases)
 [![Hassfest](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml)
@@ -14,8 +16,6 @@
 <a href="https://adnpolymerase.github.io/HA/" target="_blank"><img src="https://raw.githubusercontent.com/ADNPolymerase/HA/main/assets/site-button.svg" alt="Lien vers mon github.io pour mes autres projets" height="60"></a>
 
 Voir les courts libres de votre club de tennis sur [Ten'Up](https://tenup.fft.fr) (FFT) et réserver ou annuler un court depuis Home Assistant.
-
-> 🇬🇧 [Read in English](README.md)
 
 ## Ce que vous obtenez
 
