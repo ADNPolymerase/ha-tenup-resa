@@ -1,4 +1,4 @@
-const CARD_VERSION = "2.1.5";
+const CARD_VERSION = "2.2.0";
 
 console.info(
   "%c HA-TENUP-CARD %c v" + CARD_VERSION + " ",
@@ -618,6 +618,17 @@ class TenupCard extends HTMLElement {
       await this._fetch(true);
     } catch (err) {
       const message = (err && (err.message || err.error)) || String(err);
+      // A club may change how many players it wants on a court. The refusal has
+      // just taught the integration the real number, so read it back and open
+      // the partner dialog rather than leave a refusal nothing can act on.
+      if (pending.kind === "book" && !pending.partner) {
+        await this._fetch(true);
+        const again = this._findSlot(pending.slot.court_id, pending.slot.start);
+        if (again && again.required_players > 1) {
+          this._pending = { kind: "partner_pick", slot: again, query: "" };
+          return;
+        }
+      }
       const refused = /Ten'Up/.test(message);
       this._toast = { kind: "err", text: t(this._hass, this._config, refused ? "refused" : "failed", { message: message.replace(/^Ten'Up:\s*/, "") }) };
     } finally {

@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.2.0
+
+### Fixed
+
+A court the club wants two players on could be offered as a one-click booking,
+and the booking was then refused with "this slot wants 2 players" and nothing to
+act on. How many players a slot wants was cached against its time band alone,
+while Ten'Up answers for a court and a band together: a club whose courts do not
+share the same rule had one court inherit another one's answer, and the answer
+was kept for good. The court is now part of what is cached, and entries written
+without it are dropped rather than migrated, so the real number is learned again
+on the next refresh.
+
+A refused booking now records what the club just asked for, on that slot and on
+every other cell of the same configuration. A club that changes its mind about a
+court is picked up at once instead of refusing every booking until the cache is
+cleared by hand.
+
+### Changed
+
+On that refusal the card opens the "who are you playing with?" dialog instead of
+showing a message there was no way to act on. A refusal that has nothing to do
+with the number of players is still reported as before.
+
 ## 2.1.5
 
 ### Documentation

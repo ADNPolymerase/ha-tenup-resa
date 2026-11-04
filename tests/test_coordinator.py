@@ -205,3 +205,118 @@ def test_a_connection_error_never_counts_as_a_refusal():
         with pytest.raises(UpdateFailed):
             asyncio.run(coordinator._async_update_data())
     assert data.get(DOMAIN, {}).get("01ABCDEF", {}).get(AUTH_FAILURES, 0) == 0
+
+
+# ------------------------------------------- how many players a slot asks for
+from datetime import date, datetime, timedelta  # noqa: E402
+
+from custom_components.tenup.api import TenupPartnerRequired  # noqa: E402
+from custom_components.tenup.const import SLOT_FREE  # noqa: E402
+from custom_components.tenup.coordinator import TenupData  # noqa: E402
+from custom_components.tenup.models import Planning, Slot  # noqa: E402
+
+DAY = date(2026, 11, 4)
+
+
+def free_slot(court_id, creneau_id, hour=8):
+    start = datetime(2026, 11, 4, hour)
+    return Slot(
+        court_id=court_id,
+        court_name=f"COURT {court_id}",
+        start=start,
+        end=start + timedelta(hours=1),
+        state=SLOT_FREE,
+        creneau_id=creneau_id,
+    )
+
+
+def make_players(slots, answers, stored=None):
+    """A bare coordinator for the required-players cache and its store."""
+    coordinator = TenupCoordinator.__new__(TenupCoordinator)
+    asked = []
+    saves = []
+
+    async def async_required_players(slot):
+        asked.append((slot.court_id, slot.creneau_id))
+        return answers.get((slot.court_id, slot.creneau_id))
+
+    async def async_load():
+        return stored
+
+    async def async_save(payload):
+        saves.append(dict(payload))
+
+    coordinator.client = SimpleNamespace(
+        async_required_players=async_required_players,
+        session_cookie=f"{NAME}=live",
+    )
+    coordinator._store = SimpleNamespace(async_load=async_load, async_save=async_save)
+    coordinator._players_cache = {}
+    coordinator._cache_loaded = stored is None
+    coordinator.data = TenupData(plannings={DAY: Planning(day=DAY, slots=list(slots))})
+    coordinator.async_set_updated_data = lambda data: None
+    return coordinator, asked, saves
+
+
+def test_two_courts_sharing_a_time_band_are_asked_separately():
+    """The regression: one court's answer was taught to every court of the band.
+
+    Ten'Up answers eligibility for a court and a band together, so a covered
+    court wanting two players and an outdoor one wanting a single player can
+    carry the very same band id.
+    """
+    slots = [free_slot("37195", "900"), free_slot("21101", "900")]
+    coordinator, asked, _ = make_players(
+        slots, {("37195", "900"): 2, ("21101", "900"): 1}
+    )
+    asyncio.run(coordinator._annotate_required_players(coordinator.data))
+    assert sorted(asked) == [("21101", "900"), ("37195", "900")]
+    assert [s.required_players for s in slots] == [2, 1]
+
+
+def test_every_cell_of_one_court_and_band_is_learned_once():
+    slots = [free_slot("37195", "900", hour=h) for h in (8, 9, 10)]
+    coordinator, asked, _ = make_players(slots, {("37195", "900"): 2})
+    asyncio.run(coordinator._annotate_required_players(coordinator.data))
+    assert asked == [("37195", "900")], "one lookup per court and band, not per cell"
+    assert [s.required_players for s in slots] == [2, 2, 2]
+
+
+def test_a_cache_written_before_the_court_was_part_of_the_key_is_dropped():
+    """Those entries hold a band id alone, and are what put a one-player cell on
+    a court the club wants two players on."""
+    coordinator, _asked, _ = make_players([], {}, stored={"900": 1, "37195:900": 2})
+    asyncio.run(coordinator._load_players_cache())
+    assert coordinator._players_cache == {"37195:900": 2}
+
+
+def test_a_refused_booking_records_what_the_club_asked_for():
+    slots = [free_slot("37195", "900", hour=h) for h in (8, 9)]
+    coordinator, _asked, saves = make_players(slots, {})
+    coordinator._players_cache["37195:900"] = 1
+
+    async def book(slot, partner):
+        raise TenupPartnerRequired(2)
+
+    refreshes = []
+
+    async def refresh():
+        refreshes.append(True)
+
+    coordinator.client.async_book = book
+    coordinator.async_request_refresh = refresh
+
+    with pytest.raises(TenupPartnerRequired):
+        asyncio.run(coordinator.async_book(slots[0]))
+
+    assert coordinator._players_cache["37195:900"] == 2
+    assert saves == [{"37195:900": 2}], "the truth must survive a restart"
+    assert [s.required_players for s in slots] == [2, 2], "every cell of the band"
+    assert refreshes == [], "a refused booking books nothing to reconcile"
+
+
+def test_recording_the_same_number_twice_writes_nothing():
+    coordinator, _asked, saves = make_players([], {})
+    coordinator._players_cache["37195:900"] = 2
+    asyncio.run(coordinator._remember_required_players(free_slot("37195", "900"), 2))
+    assert saves == []

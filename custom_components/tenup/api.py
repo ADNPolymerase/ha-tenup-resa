@@ -65,6 +65,20 @@ class TenupBookingError(TenupError):
     """Ten'Up refused a booking or a cancellation, with its own message."""
 
 
+class TenupPartnerRequired(TenupBookingError):
+    """The slot wants more than one player and none was named.
+
+    Carries the number the club asks for, so the caller can record it: a club
+    may change its mind about a court, and what was cached then says otherwise.
+    """
+
+    def __init__(self, required: int) -> None:
+        super().__init__(
+            f"Ce créneau demande {required} joueurs; indiquez un partenaire"
+        )
+        self.required = required
+
+
 # The one cookie Ten'Up authenticates with, named by the site's own code. It is
 # HttpOnly, so it is read from the browser's cookie view and pasted by hand.
 SESSION_COOKIE_NAME = "SHARED_SESSION_JAVA"
@@ -497,9 +511,7 @@ class TenupClient:
         mine = await self.async_eligibility(slot)
         required = mine.required_players
         if required > 1 and partner is None:
-            raise TenupBookingError(
-                f"Ce créneau demande {required} joueurs; indiquez un partenaire"
-            )
+            raise TenupPartnerRequired(required)
 
         me = await self.async_me()
         if me is None:

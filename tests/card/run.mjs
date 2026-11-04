@@ -783,4 +783,40 @@ ok('an unrelated key does not colour', H.matchFriend('J. DOE', ['Richard ROE (12
   }
 }
 
+// -- a club that changes its mind: the refusal must become the partner dialog --
+{
+  // The integration learns the real number from the refused booking, so the
+  // very next read of the planning reports 2 where it used to report 1.
+  const TWO = { ...DATA, days: [{ date: '2026-09-11', slots: [
+    slot('21099', '2026-09-11T10:00:00+02:00', '2026-09-11T11:00:00+02:00', 'free', { required_players: 2 }),
+  ] }] };
+  const hass = makeHass();
+  hass.callWS = async (msg) => { hass.calls.push({ ws: msg }); return hass.calls.filter((c) => c.ws).length > 1 ? TWO : DATA; };
+  hass.callService = async () => { throw { message: "Ten'Up: Ce cr\u00e9neau demande 2 joueurs; indiquez un partenaire" }; };
+  const card = await makeCard({ confirm: false, days: 1 }, hass);
+  card._data = { ...DATA, days: [{ date: '2026-09-11', slots: [
+    slot('21099', '2026-09-11T10:00:00+02:00', '2026-09-11T11:00:00+02:00', 'free', { required_players: 1 }),
+  ] }] };
+  card._day = 0;
+  card._request('book', card._findSlot('21099', '2026-09-11T10:00:00+02:00'));
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+  ok('a two-player refusal opens the partner dialog instead of a dead end',
+     card._pending && card._pending.kind === 'partner_pick' && card._pending.slot.court_id === '21099');
+  ok('and no error toast is left behind', card._toast === null);
+  ok('the card is free to act again', card._busy === false);
+}
+
+// -- a refusal that has nothing to do with the players stays a refusal ---------
+{
+  const hass = makeHass();
+  hass.callService = async () => { throw { message: "Ten'Up: R\u00e9servation impossible. 1 en cours" }; };
+  const card = await makeCard({ confirm: false, days: 1 }, hass);
+  card._request('book', card._findSlot('21101', '2026-09-10T20:00:00+02:00'));
+  await new Promise((r) => setTimeout(r, 0));
+  await new Promise((r) => setTimeout(r, 0));
+  ok('a one-player slot still reports the refusal', card._toast && card._toast.kind === 'err');
+  ok('and does not ask for a partner nobody needs', card._pending === null);
+}
+
 report();

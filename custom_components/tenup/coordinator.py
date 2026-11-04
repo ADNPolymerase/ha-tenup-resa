@@ -18,6 +18,7 @@ from .api import (
     TenupBookingError,
     TenupClient,
     TenupConnectionError,
+    TenupPartnerRequired,
 )
 from .const import (
     AUTH_FAILURES,
@@ -155,12 +156,25 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         self.friends = friends
         return True
 
+    async def _load_players_cache(self) -> None:
+        """Read back what earlier refreshes learned about each slot.
+
+        A key without a court comes from before the court was part of it. Those
+        entries taught one court's answer to every court sharing its time band,
+        which is how a one-player cell ended up on a court the club wants two
+        players on, so they are dropped rather than migrated.
+        """
+        if self._cache_loaded:
+            return
+        stored = await self._store.async_load()
+        if isinstance(stored, dict):
+            self._players_cache.update(
+                {str(k): int(v) for k, v in stored.items() if ":" in str(k)}
+            )
+        self._cache_loaded = True
+
     async def _async_update_data(self) -> TenupData:
-        if not self._cache_loaded:
-            stored = await self._store.async_load()
-            if isinstance(stored, dict):
-                self._players_cache.update({str(k): int(v) for k, v in stored.items()})
-            self._cache_loaded = True
+        await self._load_players_cache()
         today = dt_util.now().date()
         data = TenupData()
         for offset in range(self.days_ahead):
@@ -220,22 +234,66 @@ class TenupCoordinator(DataUpdateCoordinator[TenupData]):
         ]
         pending: dict[str, Slot] = {}
         for slot in free:
-            if slot.creneau_id not in self._players_cache and slot.creneau_id not in pending:
-                pending[slot.creneau_id] = slot
+            key = self._players_key(slot)
+            if key not in self._players_cache and key not in pending:
+                pending[key] = slot
         learned = 0
-        for creneau_id, slot in list(pending.items())[:MAX_PLAYER_LOOKUPS]:
+        for key, slot in list(pending.items())[:MAX_PLAYER_LOOKUPS]:
             players = await self.client.async_required_players(slot)
             if players is not None:
-                self._players_cache[creneau_id] = players
+                self._players_cache[key] = players
                 learned += 1
         if learned:
             await self._store.async_save(self._players_cache)
         for slot in free:
-            slot.required_players = self._players_cache.get(slot.creneau_id)
+            slot.required_players = self._players_cache.get(self._players_key(slot))
+
+    @staticmethod
+    def _players_key(slot: Slot) -> str:
+        """How one slot configuration is cached.
+
+        Eligibility is asked for a court and a time band together, and the club
+        answers for that pair: two courts sharing a band do not share the rule
+        on how many players it wants. The court therefore belongs in the key.
+        """
+        return f"{slot.court_id}:{slot.creneau_id}"
+
+    async def _remember_required_players(self, slot: Slot, required: int) -> None:
+        """Take what a refused booking just taught us about a slot.
+
+        The club has the last word, and it may change it. Writing the real
+        number down here, on this slot and on every other cell of the same
+        configuration, is what turns a refusal the user cannot act on into a
+        cell that asks for a partner on the next click.
+        """
+        if not slot.creneau_id:
+            return
+        key = self._players_key(slot)
+        if self._players_cache.get(key) == required:
+            return
+        self._players_cache[key] = required
+        await self._store.async_save(self._players_cache)
+
+        def patch() -> None:
+            for planning in (self.data.plannings.values() if self.data else []):
+                for other in planning.slots:
+                    if other.state == SLOT_FREE and self._players_key(other) == key:
+                        other.required_players = required
+
+        self._apply_locally(patch)
 
     async def async_book(self, slot: Slot, partner: str | None = None) -> str:
         chosen = await self._resolve_partner(partner) if partner else None
-        result = await self.client.async_book(slot, chosen)
+        try:
+            result = await self.client.async_book(slot, chosen)
+        except TenupPartnerRequired as err:
+            # Never let the bookkeeping hide the refusal it came from: the user
+            # is owed Ten'Up's own message, not a storage error.
+            try:
+                await self._remember_required_players(slot, err.required)
+            except Exception:  # noqa: BLE001
+                _LOGGER.debug("Could not record the player count", exc_info=True)
+            raise
         self._apply_locally(slot.mark_mine)
         await self.async_request_refresh()
         return result
