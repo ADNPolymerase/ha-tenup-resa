@@ -4,7 +4,7 @@
 
 <a href="https://github.com/ADNPolymerase/ha-tenup-resa/blob/main/README.md"><img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/lang-en.svg" alt="Read in English" height="60"></a>
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/default)
 [![GitHub Release](https://badgen.net/github/release/ADNPolymerase/ha-tenup-resa)](https://github.com/ADNPolymerase/ha-tenup-resa/releases)
 [![Hassfest](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml)
 [![HACS Action](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hacs.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hacs.yml)
@@ -32,15 +32,21 @@ L'intégration lit le tableau de réservation des adhérents (« Réserver dans 
 - Un compte Ten'Up adhérent du club (licence avec une formule de réservation).
 - Home Assistant 2025.3 ou plus récent.
 
-## Installation
+## Installation (HACS)
 
-1. HACS > trois points > Dépôts personnalisés > `https://github.com/ADNPolymerase/ha-tenup-resa`, type Intégration.
-2. Chercher `tenup` dans HACS, télécharger **Ten'Up**, redémarrer Home Assistant.
+Disponible directement dans HACS, aucun dépôt personnalisé nécessaire.
+
+1. Ouvrez **HACS**, cherchez **Ten'Up** et téléchargez-la.
+2. Redémarrez Home Assistant.
 3. Paramètres > Appareils et services > Ajouter une intégration > **Ten'Up**.
 
-Un dépôt tout juste ajouté apparaît comme « Nouveau » et peut être masqué par le filtre de statut : cherchez-le.
-
 La carte vient avec : rien d'autre à télécharger, aucune ressource Lovelace à ajouter à la main.
+
+<details>
+<summary>Dépôt personnalisé (solution de repli)</summary>
+
+Si l'intégration n'apparaît pas dans la recherche, ouvrez le menu ⋮ > **Dépôts personnalisés** dans HACS, ajoutez `https://github.com/ADNPolymerase/ha-tenup-resa` en type **Intégration**, puis téléchargez-la comme ci-dessus. Un dépôt tout juste ajouté apparaît comme « Nouveau » et peut être masqué par le filtre de statut : cherchez-le.
+</details>
 
 > **Vous venez d'une 1.0.x ?** La carte vivait dans son propre dépôt. Retirez **Ten'Up Card** de HACS : l'intégration sert sa propre copie et retire l'ancienne ressource de tableau de bord au redémarrage suivant. Vos cartes continuent de fonctionner, leur configuration ne change pas.
 

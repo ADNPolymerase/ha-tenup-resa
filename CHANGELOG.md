@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.3.0
+
+### Changed
+
+Ten'Up is in the HACS default store: downloading it no longer needs a custom
+repository. Search for it in HACS and it is there. The READMEs say so, and keep
+the custom repository as a fallback for anyone whose HACS has not caught up yet.
+
+Nothing changed in the code: this release carries the documentation only.
+
 ## 2.2.0
 
 ### Fixed

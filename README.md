@@ -4,7 +4,7 @@
 
 <a href="https://github.com/ADNPolymerase/ha-tenup-resa/blob/main/README.fr.md"><img src="https://raw.githubusercontent.com/ADNPolymerase/ha-tenup-resa/main/docs/lang-fr.svg" alt="Lire en français" height="60"></a>
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/docs/faq/custom_repositories/)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/default)
 [![GitHub Release](https://badgen.net/github/release/ADNPolymerase/ha-tenup-resa)](https://github.com/ADNPolymerase/ha-tenup-resa/releases)
 [![Hassfest](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hassfest.yml)
 [![HACS Action](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hacs.yml/badge.svg)](https://github.com/ADNPolymerase/ha-tenup-resa/actions/workflows/hacs.yml)
@@ -32,15 +32,21 @@ The integration reads the member reservation grid of your club (`Réserver dans 
 - A Ten'Up account that is a member of the club (a licence with a booking formula).
 - Home Assistant 2025.3 or newer.
 
-## Installation
+## Installation (HACS)
 
-1. HACS > three dots > Custom repositories > `https://github.com/ADNPolymerase/ha-tenup-resa`, type Integration.
-2. Search for `tenup` in HACS, download **Ten'Up**, restart Home Assistant.
+Available directly in HACS, no custom repository needed.
+
+1. Open **HACS**, search for **Ten'Up** and download it.
+2. Restart Home Assistant.
 3. Settings > Devices and services > Add integration > **Ten'Up**.
 
-A repository you just added is listed as New and can be hidden by the status filter: search for it.
-
 The card comes with it: there is nothing else to download and no Lovelace resource to add by hand.
+
+<details>
+<summary>Custom repository (fallback)</summary>
+
+If the integration does not show up in the search, open the menu ⋮ > **Custom repositories** in HACS, add `https://github.com/ADNPolymerase/ha-tenup-resa` as an **Integration**, then download it as above. A repository you just added is listed as New and can be hidden by the status filter: search for it.
+</details>
 
 > **Upgrading from 1.0.x?** The card used to live in its own repository. Remove **Ten'Up Card** from HACS: the integration serves its own copy and drops the old dashboard resource on the next restart. Your cards keep working, the configuration does not change.
 
