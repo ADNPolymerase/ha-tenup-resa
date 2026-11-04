@@ -1,0 +1,63 @@
+name: "🐛 Bug report"
+description: "Something does not work as expected / Quelque chose ne fonctionne pas"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You can write in English or French. / Vous pouvez écrire en anglais ou en français.
+        
+        ⚠️ Do not paste your Ten'Up cookie, password or personal licence number. / Ne collez jamais votre cookie Ten'Up, votre mot de passe ni votre numéro de licence.
+        
+        Please check the [existing issues](https://github.com/ADNPolymerase/ha-tenup-resa/issues?q=is%3Aissue) first. / Vérifiez d'abord les [issues existantes](https://github.com/ADNPolymerase/ha-tenup-resa/issues?q=is%3Aissue).
+  - type: input
+    id: integration_version
+    attributes:
+      label: "Integration version / Version de l'intégration"
+      description: "HACS > the integration > version"
+      placeholder: "1.2.0"
+    validations:
+      required: true
+  - type: input
+    id: ha_version
+    attributes:
+      label: "Home Assistant version / Version de Home Assistant"
+      description: "Settings > About / Paramètres > À propos"
+      placeholder: "2026.11.0"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: "Device model / Modèle de l'appareil"
+      placeholder: "Club name, padel courts..."
+    validations:
+      required: false
+  - type: textarea
+    id: problem
+    attributes:
+      label: "What happened? / Que se passe-t-il ?"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: "What did you expect? / Qu'attendiez-vous ?"
+    validations:
+      required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: "Diagnostics / Diagnostics"
+      description: "Settings > Devices & services > the integration > ⋮ > Download diagnostics. Drag the file here. / Paramètres > Appareils et services > l'intégration > ⋮ > Télécharger les diagnostics. Glissez le fichier ici."
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs / Journaux"
+      description: "Enable debug logging, reproduce, then paste the lines (sanitized). / Activez la journalisation de débogage, reproduisez, puis collez les lignes (nettoyées)."
+      render: text
+    validations:
+      required: false
